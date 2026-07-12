@@ -1,0 +1,6 @@
+uploads/facturas/*
+!uploads/facturas/.gitkeep
+uploads/egresos/*
+!uploads/egresos/.gitkeep
+uploads/depositos/*
+!uploads/depositos/.gitkeep
