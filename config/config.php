@@ -12,7 +12,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 define('BASE_PATH', dirname(__DIR__));
-define('BASE_URL', '/'); // ajustar si la app vive en un subdirectorio
+define('BASE_URL', '/Chalimar/'); // ajustar si la app vive en un subdirectorio
 
 define('UPLOAD_FACTURAS', BASE_PATH . '/uploads/facturas/');
 define('UPLOAD_EGRESOS', BASE_PATH . '/uploads/egresos/');

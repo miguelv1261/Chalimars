@@ -2,7 +2,7 @@
 // Funciones auxiliares generales
 
 function money($amount) {
-    return 'Q' . number_format((float)$amount, 2);
+    return '$' . number_format((float)$amount, 2);
 }
 
 function h($value) {
