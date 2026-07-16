@@ -38,21 +38,48 @@ CREATE TABLE cajas_sesiones (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- Inventario de materiales
+-- Proveedores de materiales
+-- ============================================================
+CREATE TABLE proveedores (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    contacto VARCHAR(150) NULL,
+    telefono VARCHAR(50) NULL,
+    email VARCHAR(150) NULL,
+    direccion VARCHAR(255) NULL,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- Inventario de materiales (control de costos)
+--
+-- Un producto se COMPRA en una unidad (unidad_compra, ej. "botella")
+-- a un precio_compra (ej. $15) pero RINDE varias unidades de uso
+-- (unidad_uso, ej. "aplicacion") segun "rendimiento" (ej. 20).
+-- El stock se controla en unidades de uso (lo que realmente se
+-- descuenta al costear un servicio) y costo_uso = precio_compra /
+-- rendimiento es lo que se usa para costear (ej. $15 / 20 = $0.75
+-- por aplicacion).
 -- ============================================================
 CREATE TABLE productos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nombre VARCHAR(150) NOT NULL,
-    unidad VARCHAR(20) NOT NULL DEFAULT 'unidad',
-    costo_unitario DECIMAL(10,2) NOT NULL DEFAULT 0,
+    unidad_compra VARCHAR(20) NOT NULL DEFAULT 'unidad',
+    unidad_uso VARCHAR(20) NOT NULL DEFAULT 'unidad',
+    rendimiento DECIMAL(10,2) NOT NULL DEFAULT 1,
+    precio_compra DECIMAL(10,2) NOT NULL DEFAULT 0,
+    costo_uso DECIMAL(10,2) NOT NULL DEFAULT 0,
     stock DECIMAL(10,2) NOT NULL DEFAULT 0,
     stock_minimo DECIMAL(10,2) NOT NULL DEFAULT 0,
     activo TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Historial de movimientos de inventario (entradas / salidas)
+-- Historial de movimientos de inventario (entradas / salidas), en
+-- unidades de uso. Las entradas registran ademas la compra original
+-- (cantidad_compra, precio_compra_unitario, proveedor) para trazabilidad.
 CREATE TABLE productos_movimientos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     producto_id INT NOT NULL,
@@ -60,22 +87,28 @@ CREATE TABLE productos_movimientos (
     cantidad DECIMAL(10,2) NOT NULL,
     costo_unitario DECIMAL(10,2) NOT NULL,
     costo_total DECIMAL(10,2) NOT NULL,
+    cantidad_compra DECIMAL(10,2) NULL,
+    precio_compra_unitario DECIMAL(10,2) NULL,
+    proveedor_id INT NULL,
+    numero_documento VARCHAR(100) NULL,
     motivo VARCHAR(255) NOT NULL,
     ingreso_id INT NULL,
     usuario_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (producto_id) REFERENCES productos(id),
+    FOREIGN KEY (proveedor_id) REFERENCES proveedores(id),
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- Mano de obra / servicios
+-- Mano de obra (catalogo de tarifas de trabajo, reutilizable
+-- entre varias recetas de servicio)
 -- ============================================================
-CREATE TABLE servicios (
+CREATE TABLE mano_obra (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(150) NOT NULL,
     descripcion TEXT,
-    costo_mano_obra DECIMAL(10,2) NOT NULL DEFAULT 0,
+    costo DECIMAL(10,2) NOT NULL DEFAULT 0,
     activo TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -90,6 +123,37 @@ CREATE TABLE gastos_indirectos (
     costo_unitario DECIMAL(10,2) NOT NULL DEFAULT 0,
     activo TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- Servicios: paquete vendible (ej. "Corte de Cabello") con su
+-- receta de costeo predefinida (servicios_costos), para no tener
+-- que volver a cargar material por material en cada ingreso.
+-- ============================================================
+CREATE TABLE servicios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    descripcion TEXT,
+    precio_venta DECIMAL(10,2) NOT NULL DEFAULT 0,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Receta de costeo de cada servicio: que materiales, mano de obra y
+-- gastos indirectos consume, y en que cantidad.
+CREATE TABLE servicios_costos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    servicio_id INT NOT NULL,
+    tipo_costo ENUM('material','mano_obra','gasto_indirecto') NOT NULL,
+    producto_id INT NULL,
+    mano_obra_id INT NULL,
+    gasto_indirecto_id INT NULL,
+    cantidad DECIMAL(10,2) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (servicio_id) REFERENCES servicios(id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES productos(id),
+    FOREIGN KEY (mano_obra_id) REFERENCES mano_obra(id),
+    FOREIGN KEY (gasto_indirecto_id) REFERENCES gastos_indirectos(id)
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -110,14 +174,17 @@ CREATE TABLE ingresos (
     FOREIGN KEY (creado_por) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 
--- Costeo de cada ingreso: materiales, mano de obra, gastos indirectos
+-- Costeo real de cada ingreso. Se genera automaticamente al aplicar
+-- un servicio (su receta se copia aqui); origen_servicio_id indica de
+-- que servicio vino cada linea, para trazabilidad.
 CREATE TABLE ingresos_costos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     ingreso_id INT NOT NULL,
     tipo_costo ENUM('material','mano_obra','gasto_indirecto') NOT NULL,
     producto_id INT NULL,
-    servicio_id INT NULL,
+    mano_obra_id INT NULL,
     gasto_indirecto_id INT NULL,
+    origen_servicio_id INT NULL,
     cantidad DECIMAL(10,2) NOT NULL DEFAULT 1,
     costo_unitario DECIMAL(10,2) NOT NULL,
     costo_total DECIMAL(10,2) NOT NULL,
@@ -125,8 +192,9 @@ CREATE TABLE ingresos_costos (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ingreso_id) REFERENCES ingresos(id) ON DELETE CASCADE,
     FOREIGN KEY (producto_id) REFERENCES productos(id),
-    FOREIGN KEY (servicio_id) REFERENCES servicios(id),
+    FOREIGN KEY (mano_obra_id) REFERENCES mano_obra(id),
     FOREIGN KEY (gasto_indirecto_id) REFERENCES gastos_indirectos(id),
+    FOREIGN KEY (origen_servicio_id) REFERENCES servicios(id),
     FOREIGN KEY (creado_por) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 
@@ -164,6 +232,20 @@ CREATE TABLE depositos (
     FOREIGN KEY (caja_sesion_id) REFERENCES cajas_sesiones(id),
     FOREIGN KEY (creado_por) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
+
+-- ============================================================
+-- Configuracion / marca del negocio (logo, nombre, color)
+-- Siempre una unica fila con id = 1
+-- ============================================================
+CREATE TABLE configuracion (
+    id INT PRIMARY KEY DEFAULT 1,
+    nombre_negocio VARCHAR(150) NOT NULL DEFAULT 'Chalimars',
+    logo VARCHAR(255) NULL,
+    color_primario VARCHAR(7) NOT NULL DEFAULT '#8a4b6b',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+INSERT INTO configuracion (id, nombre_negocio, color_primario) VALUES (1, 'Chalimars', '#8a4b6b');
 
 -- ============================================================
 -- Usuario administrador inicial

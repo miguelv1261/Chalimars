@@ -13,20 +13,26 @@ require __DIR__ . '/../includes/header.php';
         <a class="btn" href="<?= BASE_URL ?>productos/form.php">Nuevo producto</a>
     <?php endif; ?>
 </div>
+<p class="muted">El costeo se calcula por unidad de uso: precio de compra &divide; rendimiento = costo por uso (ej. shampoo de $15 con 20 usos = $0.75 por aplicacion).</p>
 
 <div class="table-wrap">
 <table>
     <thead>
-    <tr><th>Codigo</th><th>Nombre</th><th>Unidad</th><th>Costo unitario</th><th>Stock</th><th>Stock minimo</th><th>Estado</th><th>Acciones</th></tr>
+    <tr>
+        <th>Codigo</th><th>Nombre</th>
+        <th>Compra</th><th>Rendimiento</th><th>Costo por uso</th>
+        <th>Stock (uso)</th><th>Stock minimo</th><th>Estado</th><th>Acciones</th>
+    </tr>
     </thead>
     <tbody>
     <?php foreach ($productos as $p): ?>
         <tr>
             <td><?= h($p['codigo']) ?></td>
             <td><?= h($p['nombre']) ?></td>
-            <td><?= h($p['unidad']) ?></td>
-            <td><?= money($p['costo_unitario']) ?></td>
-            <td<?= $p['stock'] <= $p['stock_minimo'] ? ' style="color:#c62828;font-weight:600;"' : '' ?>><?= h($p['stock']) ?></td>
+            <td><?= money($p['precio_compra']) ?> / <?= h($p['unidad_compra']) ?></td>
+            <td><?= h($p['rendimiento']) ?> <?= h($p['unidad_uso']) ?></td>
+            <td><?= money($p['costo_uso']) ?> / <?= h($p['unidad_uso']) ?></td>
+            <td<?= $p['stock'] <= $p['stock_minimo'] ? ' style="color:#c4293a;font-weight:600;"' : '' ?>><?= h($p['stock']) ?> <?= h($p['unidad_uso']) ?></td>
             <td><?= h($p['stock_minimo']) ?></td>
             <td><?= $p['activo'] ? 'Activo' : 'Inactivo' ?></td>
             <td class="actions">
@@ -43,6 +49,7 @@ require __DIR__ . '/../includes/header.php';
             </td>
         </tr>
     <?php endforeach; ?>
+    <?php if (!$productos): ?><tr><td colspan="9" class="muted">Sin productos registrados.</td></tr><?php endif; ?>
     </tbody>
 </table>
 </div>

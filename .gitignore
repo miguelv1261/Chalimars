@@ -4,3 +4,5 @@ uploads/egresos/*
 !uploads/egresos/.gitkeep
 uploads/depositos/*
 !uploads/depositos/.gitkeep
+
+config/database.local.php

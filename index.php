@@ -79,8 +79,8 @@ require __DIR__ . '/includes/header.php';
         <?php foreach ($stockBajo as $p): ?>
             <tr>
                 <td><?= h($p['nombre']) ?></td>
-                <td><?= h($p['stock']) ?> <?= h($p['unidad']) ?></td>
-                <td><?= h($p['stock_minimo']) ?> <?= h($p['unidad']) ?></td>
+                <td><?= h($p['stock']) ?> <?= h($p['unidad_uso']) ?></td>
+                <td><?= h($p['stock_minimo']) ?> <?= h($p['unidad_uso']) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

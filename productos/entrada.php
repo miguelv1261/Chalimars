@@ -11,24 +11,36 @@ if (!$producto) {
     redirect(BASE_URL . 'productos/index.php');
 }
 
+$proveedores = $pdo->query('SELECT * FROM proveedores WHERE activo = 1 ORDER BY nombre')->fetchAll();
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
-    $cantidad = (float)($_POST['cantidad'] ?? 0);
-    $costoUnitario = (float)($_POST['costo_unitario'] ?? $producto['costo_unitario']);
+    $cantidadCompra = (float)($_POST['cantidad_compra'] ?? 0);
+    $precioCompraUnitario = (float)($_POST['precio_compra_unitario'] ?? $producto['precio_compra']);
+    $proveedorId = (int)($_POST['proveedor_id'] ?? 0) ?: null;
+    $numeroDocumento = trim($_POST['numero_documento'] ?? '');
     $motivo = trim($_POST['motivo'] ?? 'Compra de mercaderia');
 
-    if ($cantidad <= 0) {
-        $errors[] = 'La cantidad debe ser mayor a cero.';
+    if ($cantidadCompra <= 0) {
+        $errors[] = 'La cantidad comprada debe ser mayor a cero.';
+    }
+    if ($precioCompraUnitario < 0) {
+        $errors[] = 'El precio de compra no puede ser negativo.';
     }
 
     if (!$errors) {
+        $cantidadUso = round($cantidadCompra * $producto['rendimiento'], 2);
+        $costoUso = round($precioCompraUnitario / $producto['rendimiento'], 4);
+        $costoTotal = round($cantidadUso * $costoUso, 2);
+
         $pdo->beginTransaction();
-        $pdo->prepare('UPDATE productos SET stock = stock + ?, costo_unitario = ? WHERE id = ?')
-            ->execute([$cantidad, $costoUnitario, $id]);
-        $pdo->prepare('INSERT INTO productos_movimientos (producto_id, tipo, cantidad, costo_unitario, costo_total, motivo, usuario_id) VALUES (?,?,?,?,?,?,?)')
-            ->execute([$id, 'entrada', $cantidad, $costoUnitario, $cantidad * $costoUnitario, $motivo ?: 'Compra de mercaderia', current_user()['id']]);
+        $pdo->prepare('UPDATE productos SET stock = stock + ?, precio_compra = ?, costo_uso = ? WHERE id = ?')
+            ->execute([$cantidadUso, $precioCompraUnitario, $costoUso, $id]);
+        $pdo->prepare('INSERT INTO productos_movimientos
+                (producto_id, tipo, cantidad, costo_unitario, costo_total, cantidad_compra, precio_compra_unitario, proveedor_id, numero_documento, motivo, usuario_id)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+            ->execute([$id, 'entrada', $cantidadUso, $costoUso, $costoTotal, $cantidadCompra, $precioCompraUnitario, $proveedorId, $numeroDocumento, $motivo ?: 'Compra de mercaderia', current_user()['id']]);
         $pdo->commit();
         flash_set('Entrada de inventario registrada.');
         redirect(BASE_URL . 'productos/movimientos.php?id=' . $id);
@@ -42,18 +54,31 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="panel">
     <?php foreach ($errors as $e): ?><div class="alert alert-error"><?= h($e) ?></div><?php endforeach; ?>
-    <p class="muted">Stock actual: <?= h($producto['stock']) ?> <?= h($producto['unidad']) ?></p>
+    <p class="muted">Stock actual: <?= h($producto['stock']) ?> <?= h($producto['unidad_uso']) ?> &middot; Rendimiento: 1 <?= h($producto['unidad_compra']) ?> = <?= h($producto['rendimiento']) ?> <?= h($producto['unidad_uso']) ?></p>
     <form method="post">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int)$producto['id'] ?>">
         <div class="form-grid">
             <div class="field">
-                <label>Cantidad a ingresar</label>
-                <input type="number" step="0.01" min="0.01" name="cantidad" required>
+                <label>Proveedor</label>
+                <select name="proveedor_id">
+                    <option value="">-- Sin especificar --</option>
+                    <?php foreach ($proveedores as $prov): ?>
+                        <option value="<?= (int)$prov['id'] ?>"><?= h($prov['nombre']) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="field">
-                <label>Costo unitario</label>
-                <input type="number" step="0.01" min="0" name="costo_unitario" value="<?= h($producto['costo_unitario']) ?>" required>
+                <label>Numero de factura / documento</label>
+                <input type="text" name="numero_documento">
+            </div>
+            <div class="field">
+                <label>Cantidad comprada (en <?= h($producto['unidad_compra']) ?>)</label>
+                <input type="number" step="0.01" min="0.01" name="cantidad_compra" required>
+            </div>
+            <div class="field">
+                <label>Precio de compra por <?= h($producto['unidad_compra']) ?></label>
+                <input type="number" step="0.01" min="0" name="precio_compra_unitario" value="<?= h($producto['precio_compra']) ?>" required>
             </div>
             <div class="field full">
                 <label>Motivo</label>

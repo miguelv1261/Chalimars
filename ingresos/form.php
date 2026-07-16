@@ -24,6 +24,8 @@ if ($id) {
     $sesion = require_caja_abierta($pdo);
 }
 
+$servicios = $pdo->query('SELECT * FROM servicios WHERE activo = 1 ORDER BY nombre')->fetchAll();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $ingreso['fecha'] = $_POST['fecha'] ?? date('Y-m-d');
@@ -60,10 +62,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('Ingreso actualizado correctamente.');
             redirect(BASE_URL . 'ingresos/ver.php?id=' . $id);
         } else {
+            $servicioId = (int)($_POST['servicio_id'] ?? 0) ?: null;
+            $cantidadServicio = (float)($_POST['cantidad_servicio'] ?? 1) ?: 1;
+
             $stmt = $pdo->prepare('INSERT INTO ingresos (fecha, cliente, descripcion, monto, numero_factura, factura_pdf, caja_sesion_id, creado_por) VALUES (?,?,?,?,?,?,?,?)');
             $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, $sesion['id'], current_user()['id']]);
             $newId = (int)$pdo->lastInsertId();
-            flash_set('Ingreso registrado. Ahora puede agregar el detalle de costos.');
+
+            if ($servicioId) {
+                try {
+                    aplicar_servicio_a_ingreso($pdo, $servicioId, $newId, $cantidadServicio, current_user()['id']);
+                    flash_set('Ingreso registrado y costeado automaticamente con el servicio seleccionado.');
+                } catch (RuntimeException $e) {
+                    flash_set('Ingreso registrado, pero no se pudo aplicar el costeo del servicio: ' . $e->getMessage(), 'error');
+                }
+            } else {
+                flash_set('Ingreso registrado. Ahora puede seleccionar un servicio para costearlo.');
+            }
             redirect(BASE_URL . 'ingresos/ver.php?id=' . $newId);
         }
     }
@@ -79,6 +94,23 @@ require __DIR__ . '/../includes/header.php';
     <form method="post" enctype="multipart/form-data">
         <?= csrf_field() ?>
         <div class="form-grid">
+            <?php if (!$id): ?>
+            <div class="field full">
+                <label>Servicio prestado (opcional, autocompleta y costea automaticamente)</label>
+                <select name="servicio_id" id="servicio_id" onchange="autocompletarServicio(this)">
+                    <option value="">-- Sin servicio / costear manualmente despues --</option>
+                    <?php foreach ($servicios as $s): ?>
+                        <option value="<?= (int)$s['id'] ?>" data-precio="<?= h($s['precio_venta']) ?>" data-nombre="<?= h($s['nombre']) ?>">
+                            <?= h($s['nombre']) ?> (<?= money($s['precio_venta']) ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="field">
+                <label>Cantidad del servicio</label>
+                <input type="number" step="1" min="1" name="cantidad_servicio" value="1">
+            </div>
+            <?php endif; ?>
             <div class="field">
                 <label>Fecha</label>
                 <input type="date" name="fecha" value="<?= h($ingreso['fecha']) ?>" required>
@@ -89,11 +121,11 @@ require __DIR__ . '/../includes/header.php';
             </div>
             <div class="field full">
                 <label>Descripcion del servicio / venta</label>
-                <input type="text" name="descripcion" value="<?= h($ingreso['descripcion']) ?>" required>
+                <input type="text" name="descripcion" id="descripcion" value="<?= h($ingreso['descripcion']) ?>" required>
             </div>
             <div class="field">
                 <label>Monto</label>
-                <input type="number" step="0.01" min="0.01" name="monto" value="<?= h($ingreso['monto']) ?>" required>
+                <input type="number" step="0.01" min="0.01" name="monto" id="monto" value="<?= h($ingreso['monto']) ?>" required>
             </div>
             <div class="field">
                 <label>Numero de factura</label>
@@ -109,6 +141,18 @@ require __DIR__ . '/../includes/header.php';
             <a class="btn btn-secondary" href="<?= BASE_URL ?>ingresos/index.php">Cancelar</a>
         </div>
     </form>
+    <script>
+    function autocompletarServicio(select) {
+        var opt = select.options[select.selectedIndex];
+        var precio = opt.getAttribute('data-precio');
+        var nombre = opt.getAttribute('data-nombre');
+        if (!precio) { return; }
+        var montoInput = document.getElementById('monto');
+        var descInput = document.getElementById('descripcion');
+        if (!montoInput.value || montoInput.value == '0') { montoInput.value = precio; }
+        if (!descInput.value) { descInput.value = nombre; }
+    }
+    </script>
 </div>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

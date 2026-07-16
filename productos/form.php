@@ -3,7 +3,11 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 require_role(['admin']);
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
-$producto = ['id' => null, 'codigo' => '', 'nombre' => '', 'unidad' => 'unidad', 'costo_unitario' => '', 'stock_minimo' => 0];
+$producto = [
+    'id' => null, 'codigo' => '', 'nombre' => '',
+    'unidad_compra' => 'unidad', 'unidad_uso' => 'unidad', 'rendimiento' => 1,
+    'precio_compra' => '', 'stock_minimo' => 0,
+];
 $errors = [];
 
 if ($id) {
@@ -21,33 +25,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $producto['codigo'] = trim($_POST['codigo'] ?? '');
     $producto['nombre'] = trim($_POST['nombre'] ?? '');
-    $producto['unidad'] = trim($_POST['unidad'] ?? 'unidad');
-    $producto['costo_unitario'] = (float)($_POST['costo_unitario'] ?? 0);
+    $producto['unidad_compra'] = trim($_POST['unidad_compra'] ?? 'unidad');
+    $producto['unidad_uso'] = trim($_POST['unidad_uso'] ?? 'unidad');
+    $producto['rendimiento'] = (float)($_POST['rendimiento'] ?? 1);
+    $producto['precio_compra'] = (float)($_POST['precio_compra'] ?? 0);
     $producto['stock_minimo'] = (float)($_POST['stock_minimo'] ?? 0);
     $stockInicial = (float)($_POST['stock_inicial'] ?? 0);
 
     if ($producto['codigo'] === '' || $producto['nombre'] === '') {
         $errors[] = 'Codigo y nombre son obligatorios.';
     }
-    if ($producto['costo_unitario'] < 0 || $producto['stock_minimo'] < 0) {
+    if ($producto['rendimiento'] <= 0) {
+        $errors[] = 'El rendimiento debe ser mayor a cero (cuantas unidades de uso rinde una unidad de compra).';
+    }
+    if ($producto['precio_compra'] < 0 || $producto['stock_minimo'] < 0) {
         $errors[] = 'Los valores numericos no pueden ser negativos.';
     }
 
     if (!$errors) {
+        $costoUso = round($producto['precio_compra'] / $producto['rendimiento'], 4);
         try {
             $pdo->beginTransaction();
             if ($id) {
-                $stmt = $pdo->prepare('UPDATE productos SET codigo=?, nombre=?, unidad=?, costo_unitario=?, stock_minimo=? WHERE id=?');
-                $stmt->execute([$producto['codigo'], $producto['nombre'], $producto['unidad'], $producto['costo_unitario'], $producto['stock_minimo'], $id]);
+                $stmt = $pdo->prepare('UPDATE productos SET codigo=?, nombre=?, unidad_compra=?, unidad_uso=?, rendimiento=?, precio_compra=?, costo_uso=?, stock_minimo=? WHERE id=?');
+                $stmt->execute([$producto['codigo'], $producto['nombre'], $producto['unidad_compra'], $producto['unidad_uso'], $producto['rendimiento'], $producto['precio_compra'], $costoUso, $producto['stock_minimo'], $id]);
             } else {
-                $stmt = $pdo->prepare('INSERT INTO productos (codigo, nombre, unidad, costo_unitario, stock_minimo, stock) VALUES (?,?,?,?,?,0)');
-                $stmt->execute([$producto['codigo'], $producto['nombre'], $producto['unidad'], $producto['costo_unitario'], $producto['stock_minimo']]);
+                $stmt = $pdo->prepare('INSERT INTO productos (codigo, nombre, unidad_compra, unidad_uso, rendimiento, precio_compra, costo_uso, stock_minimo, stock) VALUES (?,?,?,?,?,?,?,?,0)');
+                $stmt->execute([$producto['codigo'], $producto['nombre'], $producto['unidad_compra'], $producto['unidad_uso'], $producto['rendimiento'], $producto['precio_compra'], $costoUso, $producto['stock_minimo']]);
                 $id = (int)$pdo->lastInsertId();
 
                 if ($stockInicial > 0) {
                     $pdo->prepare('UPDATE productos SET stock = ? WHERE id = ?')->execute([$stockInicial, $id]);
                     $pdo->prepare('INSERT INTO productos_movimientos (producto_id, tipo, cantidad, costo_unitario, costo_total, motivo, usuario_id) VALUES (?,?,?,?,?,?,?)')
-                        ->execute([$id, 'entrada', $stockInicial, $producto['costo_unitario'], $stockInicial * $producto['costo_unitario'], 'Stock inicial', current_user()['id']]);
+                        ->execute([$id, 'entrada', $stockInicial, $costoUso, $stockInicial * $costoUso, 'Stock inicial', current_user()['id']]);
                 }
             }
             $pdo->commit();
@@ -79,20 +89,29 @@ require __DIR__ . '/../includes/header.php';
                 <input type="text" name="nombre" value="<?= h($producto['nombre']) ?>" required>
             </div>
             <div class="field">
-                <label>Unidad de medida</label>
-                <input type="text" name="unidad" value="<?= h($producto['unidad']) ?>" placeholder="unidad, ml, gr...">
+                <label>Unidad de compra</label>
+                <input type="text" name="unidad_compra" value="<?= h($producto['unidad_compra']) ?>" placeholder="botella, galon, caja...">
             </div>
             <div class="field">
-                <label>Costo unitario</label>
-                <input type="number" step="0.01" min="0" name="costo_unitario" value="<?= h($producto['costo_unitario']) ?>" required>
+                <label>Precio de compra (por unidad de compra)</label>
+                <input type="number" step="0.01" min="0" name="precio_compra" value="<?= h($producto['precio_compra']) ?>" required>
             </div>
             <div class="field">
-                <label>Stock minimo</label>
+                <label>Unidad de uso (para costeo)</label>
+                <input type="text" name="unidad_uso" value="<?= h($producto['unidad_uso']) ?>" placeholder="aplicacion, ml, gr...">
+            </div>
+            <div class="field">
+                <label>Rendimiento (unidades de uso por unidad de compra)</label>
+                <input type="number" step="0.01" min="0.01" name="rendimiento" value="<?= h($producto['rendimiento']) ?>" required>
+                <span class="muted">Ej. 1 botella (compra) rinde 20 aplicaciones (uso)</span>
+            </div>
+            <div class="field">
+                <label>Stock minimo (en unidades de uso)</label>
                 <input type="number" step="0.01" min="0" name="stock_minimo" value="<?= h($producto['stock_minimo']) ?>">
             </div>
             <?php if (!$id): ?>
             <div class="field">
-                <label>Stock inicial</label>
+                <label>Stock inicial (en unidades de uso)</label>
                 <input type="number" step="0.01" min="0" name="stock_inicial" value="0">
             </div>
             <?php endif; ?>

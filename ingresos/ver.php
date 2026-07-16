@@ -11,12 +11,13 @@ if (!$ingreso) {
     redirect(BASE_URL . 'ingresos/index.php');
 }
 
-$stmt = $pdo->prepare("SELECT ic.*, p.nombre AS producto_nombre, p.unidad AS producto_unidad,
-        s.nombre AS servicio_nombre, g.nombre AS gasto_nombre
+$stmt = $pdo->prepare("SELECT ic.*, p.nombre AS producto_nombre, p.unidad_uso AS producto_unidad,
+        mo.nombre AS mano_obra_nombre, g.nombre AS gasto_nombre, sv.nombre AS origen_servicio_nombre
     FROM ingresos_costos ic
     LEFT JOIN productos p ON p.id = ic.producto_id
-    LEFT JOIN servicios s ON s.id = ic.servicio_id
+    LEFT JOIN mano_obra mo ON mo.id = ic.mano_obra_id
     LEFT JOIN gastos_indirectos g ON g.id = ic.gasto_indirecto_id
+    LEFT JOIN servicios sv ON sv.id = ic.origen_servicio_id
     WHERE ic.ingreso_id = ?
     ORDER BY ic.id");
 $stmt->execute([$id]);
@@ -25,9 +26,7 @@ $costos = $stmt->fetchAll();
 $totalCosto = array_sum(array_column($costos, 'costo_total'));
 $utilidad = $ingreso['monto'] - $totalCosto;
 
-$productos = $pdo->query('SELECT * FROM productos WHERE activo = 1 ORDER BY nombre')->fetchAll();
 $servicios = $pdo->query('SELECT * FROM servicios WHERE activo = 1 ORDER BY nombre')->fetchAll();
-$gastos = $pdo->query('SELECT * FROM gastos_indirectos WHERE activo = 1 ORDER BY nombre')->fetchAll();
 
 $pageTitle = 'Detalle de ingreso';
 require __DIR__ . '/../includes/header.php';
@@ -42,7 +41,7 @@ require __DIR__ . '/../includes/header.php';
     <div class="card"><div class="label">Cliente</div><div class="value" style="font-size:16px;"><?= h($ingreso['cliente'] ?: '-') ?></div></div>
     <div class="card"><div class="label">Monto del ingreso</div><div class="value"><?= money($ingreso['monto']) ?></div></div>
     <div class="card"><div class="label">Costo total</div><div class="value"><?= money($totalCosto) ?></div></div>
-    <div class="card"><div class="label">Utilidad</div><div class="value" style="color: <?= $utilidad >= 0 ? '#2e7d32' : '#c62828' ?>;"><?= money($utilidad) ?></div></div>
+    <div class="card"><div class="label">Utilidad</div><div class="value" style="color: <?= $utilidad >= 0 ? '#1e7d3c' : '#c4293a' ?>;"><?= money($utilidad) ?></div></div>
 </div>
 
 <?php if ($ingreso['factura_pdf']): ?>
@@ -53,7 +52,7 @@ require __DIR__ . '/../includes/header.php';
     <h2 class="mt-0">Detalle de costos</h2>
     <div class="table-wrap">
     <table>
-        <thead><tr><th>Tipo</th><th>Concepto</th><th>Cantidad</th><th>Costo unitario</th><th>Costo total</th><?php if (is_admin()): ?><th></th><?php endif; ?></tr></thead>
+        <thead><tr><th>Tipo</th><th>Concepto</th><th>Servicio de origen</th><th>Cantidad</th><th>Costo unitario</th><th>Costo total</th><?php if (is_admin()): ?><th></th><?php endif; ?></tr></thead>
         <tbody>
         <?php foreach ($costos as $c): ?>
             <tr>
@@ -62,7 +61,8 @@ require __DIR__ . '/../includes/header.php';
                     <?php elseif ($c['tipo_costo'] === 'mano_obra'): ?><span class="tag tag-mano_obra">Mano de obra</span>
                     <?php else: ?><span class="tag tag-gasto_indirecto">Gasto indirecto</span><?php endif; ?>
                 </td>
-                <td><?= h($c['producto_nombre'] ?? $c['servicio_nombre'] ?? $c['gasto_nombre']) ?></td>
+                <td><?= h($c['producto_nombre'] ?? $c['mano_obra_nombre'] ?? $c['gasto_nombre']) ?></td>
+                <td><?= h($c['origen_servicio_nombre'] ?? '-') ?></td>
                 <td><?= h($c['cantidad']) ?></td>
                 <td><?= money($c['costo_unitario']) ?></td>
                 <td><?= money($c['costo_total']) ?></td>
@@ -78,78 +78,38 @@ require __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
             </tr>
         <?php endforeach; ?>
-        <?php if (!$costos): ?><tr><td colspan="6" class="muted">Sin costos registrados todavia.</td></tr><?php endif; ?>
+        <?php if (!$costos): ?><tr><td colspan="7" class="muted">Sin costos registrados todavia.</td></tr><?php endif; ?>
         </tbody>
     </table>
     </div>
 </div>
 
 <div class="panel">
-    <h2 class="mt-0">Agregar costo</h2>
-    <form method="post" action="<?= BASE_URL ?>ingresos/costos.php" id="costo-form">
+    <h2 class="mt-0">Aplicar un servicio</h2>
+    <p class="muted">Selecciona un servicio ya definido (con su receta de materiales, mano de obra y gastos indirectos) y se costeara automaticamente.</p>
+    <form method="post" action="<?= BASE_URL ?>ingresos/aplicar_servicio.php">
         <?= csrf_field() ?>
         <input type="hidden" name="ingreso_id" value="<?= (int)$ingreso['id'] ?>">
         <div class="form-grid">
-            <div class="field">
-                <label>Tipo de costo</label>
-                <select name="tipo_costo" id="tipo_costo" onchange="mostrarBloque(this.value)">
-                    <option value="material">Material (inventario)</option>
-                    <option value="mano_obra">Mano de obra / servicio</option>
-                    <option value="gasto_indirecto">Gasto indirecto</option>
-                </select>
-            </div>
-            <div class="field" id="bloque_cantidad">
-                <label>Cantidad</label>
-                <input type="number" step="0.01" min="0.01" name="cantidad" value="1" required>
-            </div>
-        </div>
-        <div class="form-grid" id="bloque_material">
-            <div class="field full">
-                <label>Producto</label>
-                <select name="producto_id">
-                    <option value="">-- Seleccione un producto --</option>
-                    <?php foreach ($productos as $p): ?>
-                        <option value="<?= (int)$p['id'] ?>" data-costo="<?= h($p['costo_unitario']) ?>">
-                            <?= h($p['nombre']) ?> (stock: <?= h($p['stock']) ?> <?= h($p['unidad']) ?> - costo <?= money($p['costo_unitario']) ?>)
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        </div>
-        <div class="form-grid" id="bloque_mano_obra" style="display:none;">
             <div class="field full">
                 <label>Servicio</label>
-                <select name="servicio_id">
+                <select name="servicio_id" required>
                     <option value="">-- Seleccione un servicio --</option>
                     <?php foreach ($servicios as $s): ?>
-                        <option value="<?= (int)$s['id'] ?>"><?= h($s['nombre']) ?> (costo <?= money($s['costo_mano_obra']) ?>)</option>
+                        <option value="<?= (int)$s['id'] ?>"><?= h($s['nombre']) ?> (<?= money($s['precio_venta']) ?>)</option>
                     <?php endforeach; ?>
                 </select>
             </div>
-        </div>
-        <div class="form-grid" id="bloque_gasto_indirecto" style="display:none;">
-            <div class="field full">
-                <label>Gasto indirecto</label>
-                <select name="gasto_indirecto_id">
-                    <option value="">-- Seleccione un gasto indirecto --</option>
-                    <?php foreach ($gastos as $g): ?>
-                        <option value="<?= (int)$g['id'] ?>"><?= h($g['nombre']) ?> (costo <?= money($g['costo_unitario']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
+            <div class="field">
+                <label>Cantidad</label>
+                <input type="number" step="1" min="1" name="cantidad" value="1" required>
             </div>
         </div>
         <div class="actions" style="margin-top:16px;">
-            <button type="submit" class="btn">Agregar costo</button>
+            <button type="submit" class="btn">Aplicar servicio</button>
+            <?php if (!$servicios): ?><span class="muted">No hay servicios activos. <a href="<?= BASE_URL ?>servicios/form.php">Crear uno</a>.</span><?php endif; ?>
         </div>
     </form>
 </div>
-
-<script>
-function mostrarBloque(tipo) {
-    document.getElementById('bloque_material').style.display = tipo === 'material' ? '' : 'none';
-    document.getElementById('bloque_mano_obra').style.display = tipo === 'mano_obra' ? '' : 'none';
-    document.getElementById('bloque_gasto_indirecto').style.display = tipo === 'gasto_indirecto' ? '' : 'none';
-}
-</script>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

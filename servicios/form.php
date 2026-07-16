@@ -3,7 +3,7 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 require_role(['admin']);
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
-$servicio = ['id' => null, 'nombre' => '', 'descripcion' => '', 'costo_mano_obra' => ''];
+$servicio = ['id' => null, 'nombre' => '', 'descripcion' => '', 'precio_venta' => ''];
 $errors = [];
 
 if ($id) {
@@ -21,25 +21,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $servicio['nombre'] = trim($_POST['nombre'] ?? '');
     $servicio['descripcion'] = trim($_POST['descripcion'] ?? '');
-    $servicio['costo_mano_obra'] = (float)($_POST['costo_mano_obra'] ?? 0);
+    $servicio['precio_venta'] = (float)($_POST['precio_venta'] ?? 0);
 
     if ($servicio['nombre'] === '') {
         $errors[] = 'El nombre es obligatorio.';
     }
-    if ($servicio['costo_mano_obra'] < 0) {
-        $errors[] = 'El costo no puede ser negativo.';
+    if ($servicio['precio_venta'] < 0) {
+        $errors[] = 'El precio de venta no puede ser negativo.';
     }
 
     if (!$errors) {
         if ($id) {
-            $stmt = $pdo->prepare('UPDATE servicios SET nombre=?, descripcion=?, costo_mano_obra=? WHERE id=?');
-            $stmt->execute([$servicio['nombre'], $servicio['descripcion'], $servicio['costo_mano_obra'], $id]);
+            $stmt = $pdo->prepare('UPDATE servicios SET nombre=?, descripcion=?, precio_venta=? WHERE id=?');
+            $stmt->execute([$servicio['nombre'], $servicio['descripcion'], $servicio['precio_venta'], $id]);
+            flash_set('Servicio actualizado correctamente.');
+            redirect(BASE_URL . 'servicios/ver.php?id=' . $id);
         } else {
-            $stmt = $pdo->prepare('INSERT INTO servicios (nombre, descripcion, costo_mano_obra) VALUES (?,?,?)');
-            $stmt->execute([$servicio['nombre'], $servicio['descripcion'], $servicio['costo_mano_obra']]);
+            $stmt = $pdo->prepare('INSERT INTO servicios (nombre, descripcion, precio_venta) VALUES (?,?,?)');
+            $stmt->execute([$servicio['nombre'], $servicio['descripcion'], $servicio['precio_venta']]);
+            $newId = (int)$pdo->lastInsertId();
+            flash_set('Servicio creado. Ahora agregue su receta de costeo.');
+            redirect(BASE_URL . 'servicios/ver.php?id=' . $newId);
         }
-        flash_set('Servicio guardado correctamente.');
-        redirect(BASE_URL . 'servicios/index.php');
     }
 }
 
@@ -54,12 +57,12 @@ require __DIR__ . '/../includes/header.php';
         <?= csrf_field() ?>
         <div class="form-grid">
             <div class="field">
-                <label>Nombre</label>
-                <input type="text" name="nombre" value="<?= h($servicio['nombre']) ?>" required>
+                <label>Nombre del servicio</label>
+                <input type="text" name="nombre" value="<?= h($servicio['nombre']) ?>" placeholder="Ej. Corte de Cabello" required>
             </div>
             <div class="field">
-                <label>Costo de mano de obra</label>
-                <input type="number" step="0.01" min="0" name="costo_mano_obra" value="<?= h($servicio['costo_mano_obra']) ?>" required>
+                <label>Precio de venta</label>
+                <input type="number" step="0.01" min="0" name="precio_venta" value="<?= h($servicio['precio_venta']) ?>" required>
             </div>
             <div class="field full">
                 <label>Descripcion</label>

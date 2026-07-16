@@ -11,9 +11,10 @@ if (!$producto) {
     redirect(BASE_URL . 'productos/index.php');
 }
 
-$stmt = $pdo->prepare("SELECT m.*, u.nombre_completo AS usuario_nombre
+$stmt = $pdo->prepare("SELECT m.*, u.nombre_completo AS usuario_nombre, pr.nombre AS proveedor_nombre
     FROM productos_movimientos m
     JOIN usuarios u ON u.id = m.usuario_id
+    LEFT JOIN proveedores pr ON pr.id = m.proveedor_id
     WHERE m.producto_id = ? ORDER BY m.created_at DESC, m.id DESC");
 $stmt->execute([$id]);
 $movimientos = $stmt->fetchAll();
@@ -29,25 +30,31 @@ require __DIR__ . '/../includes/header.php';
 <div class="summary-cards">
     <div class="card">
         <div class="label">Stock actual</div>
-        <div class="value"><?= h($producto['stock']) ?> <?= h($producto['unidad']) ?></div>
+        <div class="value"><?= h($producto['stock']) ?> <?= h($producto['unidad_uso']) ?></div>
     </div>
     <div class="card">
-        <div class="label">Costo unitario actual</div>
-        <div class="value"><?= money($producto['costo_unitario']) ?></div>
+        <div class="label">Costo por uso actual</div>
+        <div class="value"><?= money($producto['costo_uso']) ?></div>
+    </div>
+    <div class="card">
+        <div class="label">Precio de compra actual</div>
+        <div class="value"><?= money($producto['precio_compra']) ?> / <?= h($producto['unidad_compra']) ?></div>
     </div>
 </div>
 
 <div class="table-wrap">
 <table>
     <thead>
-    <tr><th>Fecha</th><th>Tipo</th><th>Cantidad</th><th>Costo unitario</th><th>Costo total</th><th>Motivo</th><th>Usuario</th></tr>
+    <tr><th>Fecha</th><th>Tipo</th><th>Cantidad (uso)</th><th>Compra</th><th>Proveedor</th><th>Costo unitario</th><th>Costo total</th><th>Motivo</th><th>Usuario</th></tr>
     </thead>
     <tbody>
     <?php foreach ($movimientos as $m): ?>
         <tr>
             <td><?= h(date('d/m/Y H:i', strtotime($m['created_at']))) ?></td>
-            <td><?= $m['tipo'] === 'entrada' ? '<span class="tag" style="background:#e8f5e9;color:#2e7d32;">Entrada</span>' : '<span class="tag" style="background:#fdecea;color:#c62828;">Salida</span>' ?></td>
-            <td><?= h($m['cantidad']) ?></td>
+            <td><?= $m['tipo'] === 'entrada' ? '<span class="tag" style="background:#e6f5ea;color:#1e7d3c;">Entrada</span>' : '<span class="tag" style="background:#fbe9eb;color:#c4293a;">Salida</span>' ?></td>
+            <td><?= h($m['cantidad']) ?> <?= h($producto['unidad_uso']) ?></td>
+            <td><?= $m['cantidad_compra'] !== null ? h($m['cantidad_compra']) . ' ' . h($producto['unidad_compra']) . ' @ ' . money($m['precio_compra_unitario']) : '-' ?></td>
+            <td><?= h($m['proveedor_nombre'] ?? '-') ?><?= $m['numero_documento'] ? ' (' . h($m['numero_documento']) . ')' : '' ?></td>
             <td><?= money($m['costo_unitario']) ?></td>
             <td><?= money($m['costo_total']) ?></td>
             <td><?= h($m['motivo']) ?><?= $m['ingreso_id'] ? ' (Ingreso #' . (int)$m['ingreso_id'] . ')' : '' ?></td>
@@ -55,7 +62,7 @@ require __DIR__ . '/../includes/header.php';
         </tr>
     <?php endforeach; ?>
     <?php if (!$movimientos): ?>
-        <tr><td colspan="7" class="muted">Sin movimientos registrados.</td></tr>
+        <tr><td colspan="9" class="muted">Sin movimientos registrados.</td></tr>
     <?php endif; ?>
     </tbody>
 </table>
