@@ -70,23 +70,29 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <?php if ($stockBajo): ?>
-<div class="panel">
-    <h2 class="mt-0">Alerta de inventario bajo</h2>
-    <div class="table-wrap">
-    <table>
-        <thead><tr><th>Producto</th><th>Stock actual</th><th>Stock minimo</th></tr></thead>
-        <tbody>
-        <?php foreach ($stockBajo as $p): ?>
-            <tr>
-                <td><?= h($p['nombre']) ?></td>
-                <td><?= h($p['stock']) ?> <?= h($p['unidad_uso']) ?></td>
-                <td><?= h($p['stock_minimo']) ?> <?= h($p['unidad_uso']) ?></td>
-            </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
+    <div class="panel">
+        <h2 class="mt-0">Alerta de inventario bajo</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Stock actual</th>
+                        <th>Stock minimo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($stockBajo as $p): ?>
+                        <tr>
+                            <td><?= h($p['nombre']) ?></td>
+                            <td><?= h($p['stock']) ?> <?= h($p['unidad_uso']) ?></td>
+                            <td><?= h($p['stock_minimo']) ?> <?= h($p['unidad_uso']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 <?php endif; ?>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>
