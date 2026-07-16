@@ -1,0 +1,38 @@
+name: Deploy a Hostinger (FTP)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  ftp-deploy:
+    name: Subir por FTP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el codigo
+        uses: actions/checkout@v4
+
+      - name: Subir archivos por FTP a Hostinger
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          # No borra ni sube lo que no debe viajar por git ni lo que
+          # solo debe existir en el servidor (config con credenciales
+          # reales, archivos subidos por los usuarios del sistema).
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/database/**
+            **/README.md
+            **/config/database.local.php
+            **/config/database.local.example.php
+            **/uploads/facturas/**
+            **/uploads/egresos/**
+            **/uploads/depositos/**
+            **/uploads/branding/**
