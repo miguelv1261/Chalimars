@@ -34,41 +34,44 @@ $config = get_config($pdo);
 ?>
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Iniciar sesion - <?= h($config['nombre_negocio']) ?></title>
-<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css">
-<style>
-:root {
-    --primary: <?= h($config['color_primario']) ?>;
-    --primary-dark: <?= h(darken_hex($config['color_primario'], 0.22)) ?>;
-    --primary-darker: <?= h(darken_hex($config['color_primario'], 0.38)) ?>;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesion - <?= h($config['nombre_negocio']) ?></title>
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css">
+    <style>
+        :root {
+            --primary: <?= h($config['color_primario']) ?>;
+            --primary-dark: <?= h(darken_hex($config['color_primario'], 0.22)) ?>;
+            --primary-darker: <?= h(darken_hex($config['color_primario'], 0.38)) ?>;
+        }
+    </style>
 </head>
+
 <body class="auth-body">
-<div class="auth-box">
-    <?php if (!empty($config['logo'])): ?>
-        <img src="<?= BASE_URL ?>uploads/branding/<?= h($config['logo']) ?>" alt="<?= h($config['nombre_negocio']) ?>" class="auth-logo">
-    <?php endif; ?>
-    <h1><?= h($config['nombre_negocio']) ?></h1>
-    <p class="muted mt-0" style="margin-top:-8px;">Control de caja</p>
-    <?php if ($error): ?>
-        <div class="alert alert-error"><?= h($error) ?></div>
-    <?php endif; ?>
-    <form method="post">
-        <?= csrf_field() ?>
-        <div class="field">
-            <label>Usuario</label>
-            <input type="text" name="username" required autofocus>
-        </div>
-        <div class="field">
-            <label>Contrasena</label>
-            <input type="password" name="password" required>
-        </div>
-        <button type="submit" class="btn">Ingresar</button>
-    </form>
-</div>
+    <div class="auth-box">
+        <?php if (!empty($config['logo'])): ?>
+            <img src="<?= BASE_URL ?>uploads/branding/<?= h($config['logo']) ?>" alt="<?= h($config['nombre_negocio']) ?>" class="auth-logo">
+        <?php endif; ?>
+        <h1><?= h($config['nombre_negocio']) ?></h1>
+        <p class="muted mt-0" style="margin-top:-8px;">Control de caja</p>
+        <?php if ($error): ?>
+            <div class="alert alert-error"><?= h($error) ?></div>
+        <?php endif; ?>
+        <form method="post">
+            <?= csrf_field() ?>
+            <div class="field">
+                <label>Usuario</label>
+                <input type="text" name="username" required autofocus>
+            </div>
+            <div class="field">
+                <label>Contrasena</label>
+                <input type="password" name="password" required>
+            </div>
+            <button type="submit" class="btn">Ingresar</button>
+        </form>
+    </div>
 </body>
+
 </html>
