@@ -124,6 +124,7 @@ $cssVersion = file_exists($cssPath) ? filemtime($cssPath) : time();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= h($pageTitle) ?> - <?= h($config['nombre_negocio']) ?></title>
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css?v=<?= $cssVersion ?>">
+    <script src="<?= BASE_URL ?>assets/js/app.js"></script>
     <style>
         :root {
             --primary: <?= h($config['color_primario']) ?>;
