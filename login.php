@@ -31,6 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $config = get_config($pdo);
+
+$cssPath = BASE_PATH . '/assets/css/style.css';
+$cssVersion = file_exists($cssPath) ? filemtime($cssPath) : time();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -39,7 +42,7 @@ $config = get_config($pdo);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar sesion - <?= h($config['nombre_negocio']) ?></title>
-    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css?v=<?= $cssVersion ?>">
     <style>
         :root {
             --primary: <?= h($config['color_primario']) ?>;
