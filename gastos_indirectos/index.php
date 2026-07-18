@@ -27,13 +27,15 @@ require __DIR__ . '/../includes/header.php';
             <td><?= money($g['costo_unitario']) ?></td>
             <td><?= $g['activo'] ? 'Activo' : 'Inactivo' ?></td>
             <?php if (is_admin()): ?>
-            <td class="actions">
-                <a class="btn btn-sm" href="<?= BASE_URL ?>gastos_indirectos/form.php?id=<?= (int)$g['id'] ?>">Editar</a>
-                <form class="inline" method="post" action="<?= BASE_URL ?>gastos_indirectos/delete.php" onsubmit="return confirm('Cambiar estado de este gasto?');">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="id" value="<?= (int)$g['id'] ?>">
-                    <button type="submit" class="btn btn-sm btn-danger"><?= $g['activo'] ? 'Desactivar' : 'Activar' ?></button>
-                </form>
+            <td>
+                <div class="action-icons">
+                    <a class="btn-icon" href="<?= BASE_URL ?>gastos_indirectos/form.php?id=<?= (int)$g['id'] ?>" title="Editar"><?= icon_svg('edit') ?></a>
+                    <form class="inline" method="post" action="<?= BASE_URL ?>gastos_indirectos/delete.php" onsubmit="return confirm('Cambiar estado de este gasto?');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="id" value="<?= (int)$g['id'] ?>">
+                        <button type="submit" class="btn-icon <?= $g['activo'] ? 'btn-icon-danger' : 'btn-icon-success' ?>" title="<?= $g['activo'] ? 'Desactivar' : 'Activar' ?>"><?= icon_svg('power') ?></button>
+                    </form>
+                </div>
             </td>
             <?php endif; ?>
         </tr>

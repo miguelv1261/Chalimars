@@ -28,13 +28,15 @@ require __DIR__ . '/../includes/header.php';
             <td><?= money($m['costo']) ?></td>
             <td><?= $m['activo'] ? 'Activo' : 'Inactivo' ?></td>
             <?php if (is_admin()): ?>
-            <td class="actions">
-                <a class="btn btn-sm" href="<?= BASE_URL ?>mano_obra/form.php?id=<?= (int)$m['id'] ?>">Editar</a>
-                <form class="inline" method="post" action="<?= BASE_URL ?>mano_obra/delete.php" onsubmit="return confirm('Cambiar estado de esta tarifa?');">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="id" value="<?= (int)$m['id'] ?>">
-                    <button type="submit" class="btn btn-sm btn-danger"><?= $m['activo'] ? 'Desactivar' : 'Activar' ?></button>
-                </form>
+            <td>
+                <div class="action-icons">
+                    <a class="btn-icon" href="<?= BASE_URL ?>mano_obra/form.php?id=<?= (int)$m['id'] ?>" title="Editar"><?= icon_svg('edit') ?></a>
+                    <form class="inline" method="post" action="<?= BASE_URL ?>mano_obra/delete.php" onsubmit="return confirm('Cambiar estado de esta tarifa?');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="id" value="<?= (int)$m['id'] ?>">
+                        <button type="submit" class="btn-icon <?= $m['activo'] ? 'btn-icon-danger' : 'btn-icon-success' ?>" title="<?= $m['activo'] ? 'Desactivar' : 'Activar' ?>"><?= icon_svg('power') ?></button>
+                    </form>
+                </div>
             </td>
             <?php endif; ?>
         </tr>

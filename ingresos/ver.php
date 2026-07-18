@@ -72,7 +72,7 @@ require __DIR__ . '/../includes/header.php';
                         <?= csrf_field() ?>
                         <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
                         <input type="hidden" name="ingreso_id" value="<?= (int)$ingreso['id'] ?>">
-                        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        <button type="submit" class="btn-icon btn-icon-danger" title="Eliminar"><?= icon_svg('trash') ?></button>
                     </form>
                 </td>
                 <?php endif; ?>

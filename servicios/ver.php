@@ -79,7 +79,9 @@ require __DIR__ . '/../includes/header.php';
                         <?= csrf_field() ?>
                         <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
                         <input type="hidden" name="servicio_id" value="<?= (int)$servicio['id'] ?>">
-                        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        <button type="submit" class="btn-icon btn-icon-danger" title="Eliminar">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        </button>
                     </form>
                 </td>
                 <?php endif; ?>
@@ -114,36 +116,31 @@ require __DIR__ . '/../includes/header.php';
         <div class="form-grid" id="bloque_material">
             <div class="field full">
                 <label>Producto</label>
-                <select name="producto_id">
-                    <option value="">-- Seleccione un producto --</option>
-                    <?php foreach ($productos as $p): ?>
-                        <option value="<?= (int)$p['id'] ?>">
-                            <?= h($p['nombre']) ?> (costo por <?= h($p['unidad_uso']) ?>: <?= money($p['costo_uso']) ?>)
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <div class="searchable-select" id="ss-producto">
+                    <input type="text" class="ss-input" placeholder="Buscar producto por nombre..." autocomplete="off">
+                    <input type="hidden" name="producto_id">
+                    <div class="ss-panel"></div>
+                </div>
             </div>
         </div>
         <div class="form-grid" id="bloque_mano_obra" style="display:none;">
             <div class="field full">
                 <label>Mano de obra</label>
-                <select name="mano_obra_id">
-                    <option value="">-- Seleccione --</option>
-                    <?php foreach ($manoObraCatalogo as $m): ?>
-                        <option value="<?= (int)$m['id'] ?>"><?= h($m['nombre']) ?> (costo <?= money($m['costo']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
+                <div class="searchable-select" id="ss-mano-obra">
+                    <input type="text" class="ss-input" placeholder="Buscar mano de obra..." autocomplete="off">
+                    <input type="hidden" name="mano_obra_id">
+                    <div class="ss-panel"></div>
+                </div>
             </div>
         </div>
         <div class="form-grid" id="bloque_gasto_indirecto" style="display:none;">
             <div class="field full">
                 <label>Gasto indirecto</label>
-                <select name="gasto_indirecto_id">
-                    <option value="">-- Seleccione --</option>
-                    <?php foreach ($gastos as $g): ?>
-                        <option value="<?= (int)$g['id'] ?>"><?= h($g['nombre']) ?> (costo <?= money($g['costo_unitario']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
+                <div class="searchable-select" id="ss-gasto">
+                    <input type="text" class="ss-input" placeholder="Buscar gasto indirecto..." autocomplete="off">
+                    <input type="hidden" name="gasto_indirecto_id">
+                    <div class="ss-panel"></div>
+                </div>
             </div>
         </div>
         <div class="actions" style="margin-top:16px;">
@@ -158,6 +155,18 @@ function mostrarBloque(tipo) {
     document.getElementById('bloque_mano_obra').style.display = tipo === 'mano_obra' ? '' : 'none';
     document.getElementById('bloque_gasto_indirecto').style.display = tipo === 'gasto_indirecto' ? '' : 'none';
 }
+
+new SearchableSelect(document.getElementById('ss-producto'), <?= json_encode(array_map(function ($p) {
+    return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'costo por ' . $p['unidad_uso'] . ': ' . money($p['costo_uso']) . ' - stock: ' . $p['stock']];
+}, $productos)) ?>);
+
+new SearchableSelect(document.getElementById('ss-mano-obra'), <?= json_encode(array_map(function ($m) {
+    return ['value' => (string)$m['id'], 'label' => $m['nombre'], 'meta' => 'costo: ' . money($m['costo'])];
+}, $manoObraCatalogo)) ?>);
+
+new SearchableSelect(document.getElementById('ss-gasto'), <?= json_encode(array_map(function ($g) {
+    return ['value' => (string)$g['id'], 'label' => $g['nombre'], 'meta' => 'costo: ' . money($g['costo_unitario'])];
+}, $gastos)) ?>);
 </script>
 <?php endif; ?>
 

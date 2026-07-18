@@ -37,7 +37,7 @@ require __DIR__ . '/../includes/header.php';
             <td><?= $s['diferencia'] !== null ? money($s['diferencia']) : '-' ?></td>
             <td><?= $s['estado'] === 'abierta' ? '<span class="badge badge-open">Abierta</span>' : '<span class="badge badge-closed">Cerrada</span>' ?></td>
             <td><?= h($s['abierta_por_nombre']) ?></td>
-            <td><a class="btn btn-sm" href="<?= BASE_URL ?>caja/ver.php?id=<?= (int)$s['id'] ?>">Ver</a></td>
+            <td><a class="btn-icon" href="<?= BASE_URL ?>caja/ver.php?id=<?= (int)$s['id'] ?>" title="Ver detalle"><?= icon_svg('eye') ?></a></td>
         </tr>
     <?php endforeach; ?>
     </tbody>

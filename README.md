@@ -1,10 +1,10 @@
 # Chalimars - Sistema de Caja y Costos
 
 Sistema web (HTML, CSS y PHP puro con MySQL/MariaDB) para el control de caja de una
-peluqueria: ingresos con factura en PDF, egresos, depositos, cierres de caja, costeo
-de cada ingreso (materiales, mano de obra, gastos indirectos), inventario de materiales
-con historial de movimientos, y catalogos de servicios y gastos indirectos. Incluye
-control de acceso por roles: **administrador** y **cajero**.
+peluqueria: ingresos con factura en PDF, egresos, depositos, cierres de caja, servicios
+con receta de costeo predefinida (materiales, mano de obra, gastos indirectos),
+inventario de materiales con precio de compra vs costo por uso y proveedores, e historial
+de movimientos. Incluye control de acceso por roles: **administrador** y **cajero**.
 
 ## Requisitos
 
@@ -17,8 +17,13 @@ control de acceso por roles: **administrador** y **cajero**.
 1. Crear la base de datos e importar el esquema:
 
    ```bash
-   mysql -u root -p < database/schema.sql
+   mysql --default-character-set=utf8mb4 -u root -p < database/schema.sql
    ```
+
+   **Importante:** siempre incluya `--default-character-set=utf8mb4` al importar
+   cualquier archivo `.sql` de este proyecto (aqui y en las migraciones). Sin ese
+   parametro, el cliente `mysql` puede interpretar mal los nombres, tildes y la letra
+   ñ (ej. "PESTAÑAS" queda guardado como "PESTAÃ‘AS").
 
    Esto crea la base `chalimars`, todas las tablas y un usuario administrador inicial:
 
@@ -48,27 +53,94 @@ control de acceso por roles: **administrador** y **cajero**.
 
 ## Roles y accesos
 
-- **Administrador**: acceso total. Gestiona usuarios, catalogos (productos, servicios,
-  gastos indirectos), edita o elimina ingresos/egresos/depositos y elimina lineas de
-  costo (repone stock automaticamente si era un material).
-- **Cajero**: abre/cierra caja, registra ingresos (con factura PDF) y su detalle de
-  costos, registra egresos y depositos, y consulta los catalogos e inventario en modo
-  solo lectura. No puede gestionar usuarios ni editar/eliminar registros ya creados.
+- **Administrador**: acceso total. Gestiona usuarios, catalogos (productos, proveedores,
+  mano de obra, gastos indirectos), define la receta de costeo de cada servicio, edita
+  o elimina ingresos/egresos/depositos, y elimina lineas de costo (repone stock
+  automaticamente si era un material).
+- **Cajero**: abre/cierra caja, registra ingresos (con factura PDF) aplicando servicios
+  ya definidos, registra egresos y depositos, y consulta los catalogos e inventario en
+  modo solo lectura. No puede gestionar usuarios, proveedores, ni editar catalogos o
+  recetas de servicio.
 
 ## Flujo de trabajo
 
-1. Un usuario abre una caja (`Caja > Abrir caja`) indicando el efectivo inicial.
-2. Mientras la caja este abierta se pueden registrar ingresos, egresos y depositos;
+1. **Configurar una vez**: se cargan los productos (`Inventario materiales`, con su
+   precio de compra y rendimiento), la mano de obra (`Mano de obra`) y los gastos
+   indirectos (`Gastos indirectos`). Con eso se arma cada **Servicio** (ej. "Corte de
+   Cabello") agregandole su receta de costeo: que materiales usa (y cuantos), que mano
+   de obra y que gastos indirectos, ademas de su precio de venta.
+2. Un usuario abre una caja (`Caja > Abrir caja`) indicando el efectivo inicial.
+3. Mientras la caja este abierta se pueden registrar ingresos, egresos y depositos;
    quedan asociados a esa sesion de caja.
-3. Cada ingreso permite adjuntar su factura en PDF y luego, desde su detalle, agregar
-   el desglose de costos seleccionando materiales del inventario (descuenta stock y
-   genera un movimiento), servicios/mano de obra, y gastos indirectos. El sistema
-   calcula automaticamente el costo total y la utilidad de cada ingreso.
-4. Al finalizar el turno se cierra la caja (`Caja > Cerrar caja actual`): el sistema
+4. Al registrar un ingreso, se selecciona el **servicio** prestado (y cuantas veces) -
+   el sistema autocompleta el monto sugerido y aplica automaticamente toda la receta de
+   costeo (descontando stock de materiales y calculando la utilidad), sin tener que
+   cargar material por material cada vez. Se pueden aplicar varios servicios a un mismo
+   ingreso desde su detalle.
+5. Al finalizar el turno se cierra la caja (`Caja > Cerrar caja actual`): el sistema
    calcula el monto esperado (apertura + ingresos - egresos - depositos) y compara
    contra el efectivo contado, mostrando la diferencia.
-5. El inventario de materiales mantiene un historial completo de entradas (compras)
-   y salidas (consumo en ingresos) por producto, en `Inventario materiales > Movimientos`.
+6. El inventario mantiene el costeo por unidad de uso: un producto se compra en una
+   unidad (ej. "botella" a $15) pero rinde varias unidades de uso (ej. 20
+   "aplicaciones"), y el costo por uso ($0.75) es el que se aplica en las recetas. Las
+   entradas de stock (`Inventario materiales > Entrada stock`) registran el proveedor y
+   el numero de documento para trazabilidad de compras; el historial completo queda en
+   `Inventario materiales > Movimientos`.
+
+## Actualizar una instalacion existente
+
+Si ya tenia el sistema instalado con una version anterior, corra las migraciones nuevas
+en orden (o recree la base con `database/schema.sql` si aun no tiene datos reales que
+conservar):
+
+```bash
+mysql --default-character-set=utf8mb4 -u usuario -p chalimars < database/migrations/002_configuracion.sql
+mysql --default-character-set=utf8mb4 -u usuario -p chalimars < database/migrations/003_servicios_costeo_proveedores.sql
+mysql --default-character-set=utf8mb4 -u usuario -p chalimars < database/migrations/004_import_inventario_inicial.sql
+mysql --default-character-set=utf8mb4 -u usuario -p chalimars < database/migrations/005_fix_encoding_utf8.sql
+```
+
+La migracion 003 renombra tablas y columnas (`servicios` pasa a ser `mano_obra`, entre
+otros cambios) - respalde la base de datos antes de correrla si tiene datos que le
+importen. La migracion 005 corrige nombres con ñ/tildes que hayan quedado mal
+codificados por no usar `--default-character-set=utf8mb4` al importar (es segura de
+correr aunque sus datos ya esten bien).
+
+## Despliegue automatico (GitHub Actions + FTP)
+
+El workflow `.github/workflows/deploy.yml` sube automaticamente los archivos al hosting
+por FTP/FTPS cada vez que se hace `git push` a la rama `main`.
+
+Flujo: `git push` -> GitHub -> GitHub Actions -> FTP/FTPS -> hosting (ej. Hostinger).
+
+### Configuracion (una sola vez)
+
+1. En el repositorio de GitHub: **Settings > Secrets and variables > Actions > New
+   repository secret**, y cree estos 4 secretos con los datos FTP de su hosting
+   (en Hostinger: hPanel > Archivos > Cuentas FTP):
+
+   | Secreto | Ejemplo |
+   |---|---|
+   | `FTP_SERVER` | `ftp.midominio.com` |
+   | `FTP_USERNAME` | `u123456789.chalimars` |
+   | `FTP_PASSWORD` | la contrasena de esa cuenta FTP |
+   | `FTP_SERVER_DIR` | `/public_html/` (o `/public_html/chalimars/` si va en subcarpeta) |
+
+2. Cree manualmente en el servidor (por FTP o el Administrador de archivos del hosting,
+   **no por git**, para no exponer credenciales en el repositorio) el archivo
+   `config/database.local.php` con las credenciales reales de la base de datos del
+   hosting. Vea `config/database.local.example.php` como plantilla.
+
+3. Importe `database/schema.sql` en la base de datos del hosting (phpMyAdmin o
+   `mysql` por SSH si el plan lo permite).
+
+4. Haga `git push origin main`: el workflow se dispara solo y sube los archivos. Puede
+   ver el progreso en la pestana **Actions** del repositorio en GitHub.
+
+El workflow excluye de la subida (y por lo tanto nunca toca ni borra en el servidor):
+`.git`, `.github`, `database/`, `README.md`, `config/database.local.php`, y las
+subcarpetas de `uploads/` (facturas, egresos, depositos, logos) donde vive contenido
+generado por los propios usuarios del sistema, no por el codigo fuente.
 
 ## Seguridad
 

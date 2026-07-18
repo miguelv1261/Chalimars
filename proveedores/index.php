@@ -25,13 +25,15 @@ require __DIR__ . '/../includes/header.php';
             <td><?= h($p['telefono']) ?></td>
             <td><?= h($p['email']) ?></td>
             <td><?= $p['activo'] ? 'Activo' : 'Inactivo' ?></td>
-            <td class="actions">
-                <a class="btn btn-sm" href="<?= BASE_URL ?>proveedores/form.php?id=<?= (int)$p['id'] ?>">Editar</a>
-                <form class="inline" method="post" action="<?= BASE_URL ?>proveedores/delete.php" onsubmit="return confirm('Cambiar estado de este proveedor?');">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
-                    <button type="submit" class="btn btn-sm btn-danger"><?= $p['activo'] ? 'Desactivar' : 'Activar' ?></button>
-                </form>
+            <td>
+                <div class="action-icons">
+                    <a class="btn-icon" href="<?= BASE_URL ?>proveedores/form.php?id=<?= (int)$p['id'] ?>" title="Editar"><?= icon_svg('edit') ?></a>
+                    <form class="inline" method="post" action="<?= BASE_URL ?>proveedores/delete.php" onsubmit="return confirm('Cambiar estado de este proveedor?');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                        <button type="submit" class="btn-icon <?= $p['activo'] ? 'btn-icon-danger' : 'btn-icon-success' ?>" title="<?= $p['activo'] ? 'Desactivar' : 'Activar' ?>"><?= icon_svg('power') ?></button>
+                    </form>
+                </div>
             </td>
         </tr>
     <?php endforeach; ?>

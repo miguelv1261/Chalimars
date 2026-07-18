@@ -9,6 +9,31 @@ function h($value) {
     return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
+/**
+ * Devuelve el contenido interno (paths) de un icono SVG (estilo feather),
+ * para usar dentro de botones de accion compactos en tablas.
+ */
+function icon_paths($name) {
+    $icons = [
+        'eye' => '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>',
+        'edit' => '<path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>',
+        'history' => '<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>',
+        'plus-circle' => '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line>',
+        'power' => '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line>',
+        'trash' => '<polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line>',
+        'users' => '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>',
+    ];
+    return $icons[$name] ?? '';
+}
+
+/**
+ * Devuelve el <svg> completo de un icono, para usar dentro de un
+ * <a class="btn-icon" title="..."> o <button class="btn-icon" title="...">.
+ */
+function icon_svg($name) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . icon_paths($name) . '</svg>';
+}
+
 function redirect($path) {
     header('Location: ' . $path);
     exit;

@@ -30,7 +30,7 @@ require __DIR__ . '/../includes/header.php';
                 <form class="inline" method="post" action="<?= BASE_URL ?>depositos/delete.php" onsubmit="return confirm('Eliminar este deposito?');">
                     <?= csrf_field() ?>
                     <input type="hidden" name="id" value="<?= (int)$d['id'] ?>">
-                    <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                    <button type="submit" class="btn-icon btn-icon-danger" title="Eliminar"><?= icon_svg('trash') ?></button>
                 </form>
             </td>
             <?php endif; ?>

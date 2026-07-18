@@ -48,16 +48,18 @@ require __DIR__ . '/../includes/header.php';
             <td><?= money($s['costo_total']) ?></td>
             <td style="color: <?= $utilidad >= 0 ? '#1e7d3c' : '#c4293a' ?>;"><?= money($utilidad) ?></td>
             <td><?= $s['activo'] ? 'Activo' : 'Inactivo' ?></td>
-            <td class="actions">
-                <a class="btn btn-sm" href="<?= BASE_URL ?>servicios/ver.php?id=<?= (int)$s['id'] ?>">Ver receta</a>
-                <?php if (is_admin()): ?>
-                    <a class="btn btn-sm" href="<?= BASE_URL ?>servicios/form.php?id=<?= (int)$s['id'] ?>">Editar</a>
-                    <form class="inline" method="post" action="<?= BASE_URL ?>servicios/delete.php" onsubmit="return confirm('Cambiar estado de este servicio?');">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
-                        <button type="submit" class="btn btn-sm btn-danger"><?= $s['activo'] ? 'Desactivar' : 'Activar' ?></button>
-                    </form>
-                <?php endif; ?>
+            <td>
+                <div class="action-icons">
+                    <a class="btn-icon" href="<?= BASE_URL ?>servicios/ver.php?id=<?= (int)$s['id'] ?>" title="Ver receta"><?= icon_svg('eye') ?></a>
+                    <?php if (is_admin()): ?>
+                        <a class="btn-icon" href="<?= BASE_URL ?>servicios/form.php?id=<?= (int)$s['id'] ?>" title="Editar"><?= icon_svg('edit') ?></a>
+                        <form class="inline" method="post" action="<?= BASE_URL ?>servicios/delete.php" onsubmit="return confirm('Cambiar estado de este servicio?');">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
+                            <button type="submit" class="btn-icon <?= $s['activo'] ? 'btn-icon-danger' : 'btn-icon-success' ?>" title="<?= $s['activo'] ? 'Desactivar' : 'Activar' ?>"><?= icon_svg('power') ?></button>
+                        </form>
+                    <?php endif; ?>
+                </div>
             </td>
         </tr>
     <?php endforeach; ?>

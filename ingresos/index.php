@@ -29,13 +29,15 @@ require __DIR__ . '/../includes/header.php';
             <td><?= h($i['descripcion']) ?></td>
             <td><?= money($i['monto']) ?></td>
             <td><?= money($i['total_costo']) ?></td>
-            <td style="color: <?= $utilidad >= 0 ? '#2e7d32' : '#c62828' ?>;"><?= money($utilidad) ?></td>
+            <td style="color: <?= $utilidad >= 0 ? '#1e7d3c' : '#c4293a' ?>;"><?= money($utilidad) ?></td>
             <td><?= $i['factura_pdf'] ? '<a href="' . BASE_URL . 'uploads/facturas/' . h($i['factura_pdf']) . '" target="_blank">PDF</a>' : '-' ?></td>
-            <td class="actions">
-                <a class="btn btn-sm" href="<?= BASE_URL ?>ingresos/ver.php?id=<?= (int)$i['id'] ?>">Ver / Costear</a>
-                <?php if (is_admin()): ?>
-                    <a class="btn btn-sm" href="<?= BASE_URL ?>ingresos/form.php?id=<?= (int)$i['id'] ?>">Editar</a>
-                <?php endif; ?>
+            <td>
+                <div class="action-icons">
+                    <a class="btn-icon" href="<?= BASE_URL ?>ingresos/ver.php?id=<?= (int)$i['id'] ?>" title="Ver / Costear"><?= icon_svg('eye') ?></a>
+                    <?php if (is_admin()): ?>
+                        <a class="btn-icon" href="<?= BASE_URL ?>ingresos/form.php?id=<?= (int)$i['id'] ?>" title="Editar"><?= icon_svg('edit') ?></a>
+                    <?php endif; ?>
+                </div>
             </td>
         </tr>
     <?php endforeach; ?>
