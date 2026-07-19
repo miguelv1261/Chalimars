@@ -23,7 +23,6 @@ if ($id) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
-    $producto['codigo'] = trim($_POST['codigo'] ?? '');
     $producto['nombre'] = trim($_POST['nombre'] ?? '');
     $producto['unidad_compra'] = trim($_POST['unidad_compra'] ?? 'unidad');
     $producto['unidad_uso'] = trim($_POST['unidad_uso'] ?? 'unidad');
@@ -32,8 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $producto['stock_minimo'] = (float)($_POST['stock_minimo'] ?? 0);
     $stockInicial = (float)($_POST['stock_inicial'] ?? 0);
 
-    if ($producto['codigo'] === '' || $producto['nombre'] === '') {
-        $errors[] = 'Codigo y nombre son obligatorios.';
+    if ($producto['nombre'] === '') {
+        $errors[] = 'El nombre es obligatorio.';
     }
     if ($producto['rendimiento'] <= 0) {
         $errors[] = 'El rendimiento debe ser mayor a cero (cuantas unidades de uso rinde una unidad de compra).';
@@ -47,12 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
             if ($id) {
-                $stmt = $pdo->prepare('UPDATE productos SET codigo=?, nombre=?, unidad_compra=?, unidad_uso=?, rendimiento=?, precio_compra=?, costo_uso=?, stock_minimo=? WHERE id=?');
-                $stmt->execute([$producto['codigo'], $producto['nombre'], $producto['unidad_compra'], $producto['unidad_uso'], $producto['rendimiento'], $producto['precio_compra'], $costoUso, $producto['stock_minimo'], $id]);
+                $stmt = $pdo->prepare('UPDATE productos SET nombre=?, unidad_compra=?, unidad_uso=?, rendimiento=?, precio_compra=?, costo_uso=?, stock_minimo=? WHERE id=?');
+                $stmt->execute([$producto['nombre'], $producto['unidad_compra'], $producto['unidad_uso'], $producto['rendimiento'], $producto['precio_compra'], $costoUso, $producto['stock_minimo'], $id]);
             } else {
+                $codigoTemporal = 'TMP-' . bin2hex(random_bytes(8));
                 $stmt = $pdo->prepare('INSERT INTO productos (codigo, nombre, unidad_compra, unidad_uso, rendimiento, precio_compra, costo_uso, stock_minimo, stock) VALUES (?,?,?,?,?,?,?,?,0)');
-                $stmt->execute([$producto['codigo'], $producto['nombre'], $producto['unidad_compra'], $producto['unidad_uso'], $producto['rendimiento'], $producto['precio_compra'], $costoUso, $producto['stock_minimo']]);
+                $stmt->execute([$codigoTemporal, $producto['nombre'], $producto['unidad_compra'], $producto['unidad_uso'], $producto['rendimiento'], $producto['precio_compra'], $costoUso, $producto['stock_minimo']]);
                 $id = (int)$pdo->lastInsertId();
+
+                $producto['codigo'] = 'P' . str_pad((string)$id, 4, '0', STR_PAD_LEFT);
+                $pdo->prepare('UPDATE productos SET codigo = ? WHERE id = ?')->execute([$producto['codigo'], $id]);
 
                 if ($stockInicial > 0) {
                     $pdo->prepare('UPDATE productos SET stock = ? WHERE id = ?')->execute([$stockInicial, $id]);
@@ -80,10 +83,18 @@ require __DIR__ . '/../includes/header.php';
     <form method="post">
         <?= csrf_field() ?>
         <div class="form-grid">
+            <?php if ($id): ?>
             <div class="field">
                 <label>Codigo</label>
-                <input type="text" name="codigo" value="<?= h($producto['codigo']) ?>" required>
+                <input type="text" value="<?= h($producto['codigo']) ?>" disabled>
+                <span class="muted">Generado automaticamente, no editable.</span>
             </div>
+            <?php else: ?>
+            <div class="field">
+                <label>Codigo</label>
+                <input type="text" value="Se genera automaticamente al guardar" disabled>
+            </div>
+            <?php endif; ?>
             <div class="field">
                 <label>Nombre</label>
                 <input type="text" name="nombre" value="<?= h($producto['nombre']) ?>" required>

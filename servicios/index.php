@@ -5,25 +5,29 @@ require_login();
 $pageTitle = 'Servicios';
 
 $servicios = $pdo->query("
-    SELECT s.*, COALESCE(c.costo_total, 0) AS costo_total
+    SELECT s.*, COALESCE(c.costo_total, 0) AS costo_receta
     FROM servicios s
     LEFT JOIN (
         SELECT sc.servicio_id,
             SUM(
                 CASE sc.tipo_costo
                     WHEN 'material' THEN sc.cantidad * p.costo_uso
-                    WHEN 'mano_obra' THEN sc.cantidad * mo.costo
                     WHEN 'gasto_indirecto' THEN sc.cantidad * gi.costo_unitario
                 END
             ) AS costo_total
         FROM servicios_costos sc
         LEFT JOIN productos p ON p.id = sc.producto_id
-        LEFT JOIN mano_obra mo ON mo.id = sc.mano_obra_id
         LEFT JOIN gastos_indirectos gi ON gi.id = sc.gasto_indirecto_id
+        WHERE sc.tipo_costo != 'mano_obra'
         GROUP BY sc.servicio_id
     ) c ON c.servicio_id = s.id
     ORDER BY s.nombre
 ")->fetchAll();
+
+foreach ($servicios as &$s) {
+    $s['costo_total'] = $s['costo_receta'] + costo_mano_obra_servicio($s['precio_venta']);
+}
+unset($s);
 
 require __DIR__ . '/../includes/header.php';
 ?>

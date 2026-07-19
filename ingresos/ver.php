@@ -61,7 +61,7 @@ require __DIR__ . '/../includes/header.php';
                     <?php elseif ($c['tipo_costo'] === 'mano_obra'): ?><span class="tag tag-mano_obra">Mano de obra</span>
                     <?php else: ?><span class="tag tag-gasto_indirecto">Gasto indirecto</span><?php endif; ?>
                 </td>
-                <td><?= h($c['producto_nombre'] ?? $c['mano_obra_nombre'] ?? $c['gasto_nombre']) ?></td>
+                <td><?= h($c['producto_nombre'] ?? $c['mano_obra_nombre'] ?? $c['gasto_nombre'] ?? ($c['tipo_costo'] === 'mano_obra' ? 'Mano de obra (' . (MANO_OBRA_PORCENTAJE * 100) . '%)' : '')) ?></td>
                 <td><?= h($c['origen_servicio_nombre'] ?? '-') ?></td>
                 <td><?= h($c['cantidad']) ?></td>
                 <td><?= money($c['costo_unitario']) ?></td>

@@ -2,7 +2,6 @@
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_login();
 
-$sesion = require_caja_abierta($pdo);
 $errors = [];
 $egreso = ['fecha' => date('Y-m-d'), 'descripcion' => '', 'monto' => '', 'tipo_documento' => 'factura', 'numero_documento' => ''];
 
@@ -31,8 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
-        $stmt = $pdo->prepare('INSERT INTO egresos (fecha, descripcion, monto, tipo_documento, numero_documento, documento_archivo, caja_sesion_id, creado_por) VALUES (?,?,?,?,?,?,?,?)');
-        $stmt->execute([$egreso['fecha'], $egreso['descripcion'], $egreso['monto'], $egreso['tipo_documento'], $egreso['numero_documento'], $archivo, $sesion['id'], current_user()['id']]);
+        $stmt = $pdo->prepare('INSERT INTO egresos (fecha, descripcion, monto, tipo_documento, numero_documento, documento_archivo, creado_por) VALUES (?,?,?,?,?,?,?)');
+        $stmt->execute([$egreso['fecha'], $egreso['descripcion'], $egreso['monto'], $egreso['tipo_documento'], $egreso['numero_documento'], $archivo, current_user()['id']]);
         flash_set('Egreso registrado correctamente.');
         redirect(BASE_URL . 'egresos/index.php');
     }

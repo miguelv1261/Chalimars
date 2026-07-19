@@ -2,7 +2,6 @@
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_login();
 
-$sesion = require_caja_abierta($pdo);
 $errors = [];
 $deposito = ['fecha' => date('Y-m-d'), 'monto' => '', 'banco' => '', 'numero_referencia' => ''];
 
@@ -27,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
-        $stmt = $pdo->prepare('INSERT INTO depositos (fecha, monto, banco, numero_referencia, comprobante_archivo, caja_sesion_id, creado_por) VALUES (?,?,?,?,?,?,?)');
-        $stmt->execute([$deposito['fecha'], $deposito['monto'], $deposito['banco'], $deposito['numero_referencia'], $archivo, $sesion['id'], current_user()['id']]);
+        $stmt = $pdo->prepare('INSERT INTO depositos (fecha, monto, banco, numero_referencia, comprobante_archivo, creado_por) VALUES (?,?,?,?,?,?)');
+        $stmt->execute([$deposito['fecha'], $deposito['monto'], $deposito['banco'], $deposito['numero_referencia'], $archivo, current_user()['id']]);
         flash_set('Deposito registrado correctamente.');
         redirect(BASE_URL . 'depositos/index.php');
     }

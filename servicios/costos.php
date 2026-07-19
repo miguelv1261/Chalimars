@@ -19,7 +19,7 @@ if (!$servicio) {
 $tipo = $_POST['tipo_costo'] ?? '';
 $cantidad = (float)($_POST['cantidad'] ?? 1);
 
-if (!in_array($tipo, ['material', 'mano_obra', 'gasto_indirecto'], true) || $cantidad <= 0) {
+if (!in_array($tipo, ['material', 'gasto_indirecto'], true) || $cantidad <= 0) {
     flash_set('Datos de costo invalidos.', 'error');
     redirect(BASE_URL . 'servicios/ver.php?id=' . $servicioId);
 }
@@ -34,17 +34,6 @@ if ($tipo === 'material') {
     }
     $pdo->prepare('INSERT INTO servicios_costos (servicio_id, tipo_costo, producto_id, cantidad) VALUES (?,?,?,?)')
         ->execute([$servicioId, 'material', $productoId, $cantidad]);
-
-} elseif ($tipo === 'mano_obra') {
-    $manoObraId = (int)($_POST['mano_obra_id'] ?? 0);
-    $stmt = $pdo->prepare('SELECT id FROM mano_obra WHERE id = ?');
-    $stmt->execute([$manoObraId]);
-    if (!$stmt->fetch()) {
-        flash_set('Mano de obra no encontrada.', 'error');
-        redirect(BASE_URL . 'servicios/ver.php?id=' . $servicioId);
-    }
-    $pdo->prepare('INSERT INTO servicios_costos (servicio_id, tipo_costo, mano_obra_id, cantidad) VALUES (?,?,?,?)')
-        ->execute([$servicioId, 'mano_obra', $manoObraId, $cantidad]);
 
 } else {
     $gastoId = (int)($_POST['gasto_indirecto_id'] ?? 0);

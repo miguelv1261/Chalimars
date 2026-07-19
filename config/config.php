@@ -33,3 +33,7 @@ define('UPLOAD_DEPOSITOS', BASE_PATH . '/uploads/depositos/');
 define('UPLOAD_BRANDING', BASE_PATH . '/uploads/branding/');
 
 define('MAX_UPLOAD_SIZE', 5 * 1024 * 1024); // 5 MB
+
+// Porcentaje del precio de venta de un servicio que se costea como
+// mano de obra (ya no se elige de un catalogo, se calcula solo).
+define('MANO_OBRA_PORCENTAJE', 0.30);

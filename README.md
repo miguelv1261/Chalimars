@@ -1,10 +1,12 @@
 # Chalimars - Sistema de Caja y Costos
 
-Sistema web (HTML, CSS y PHP puro con MySQL/MariaDB) para el control de caja de una
-peluqueria: ingresos con factura en PDF, egresos, depositos, cierres de caja, servicios
-con receta de costeo predefinida (materiales, mano de obra, gastos indirectos),
-inventario de materiales con precio de compra vs costo por uso y proveedores, e historial
-de movimientos. Incluye control de acceso por roles: **administrador** y **cajero**.
+Sistema web (HTML, CSS y PHP puro con MySQL/MariaDB) para llevar la contabilidad de
+costos de una peluqueria: registro de ingresos (con factura en PDF), egresos y
+depositos bancarios; servicios con receta de costeo predefinida (materiales y gastos
+indirectos, mas mano de obra calculada automaticamente); inventario de materiales con
+precio de compra vs costo por uso y proveedores; y un libro diario para contabilidad
+(ventas, depositos, egresos, costos y servicios completados). Incluye control de acceso
+por roles: **administrador** y **cajero**.
 
 ## Requisitos
 
@@ -55,37 +57,42 @@ de movimientos. Incluye control de acceso por roles: **administrador** y **cajer
 
 - **Administrador**: acceso total. Gestiona usuarios, catalogos (productos, proveedores,
   mano de obra, gastos indirectos), define la receta de costeo de cada servicio, edita
-  o elimina ingresos/egresos/depositos, y elimina lineas de costo (repone stock
-  automaticamente si era un material).
-- **Cajero**: abre/cierra caja, registra ingresos (con factura PDF) aplicando servicios
-  ya definidos, registra egresos y depositos, y consulta los catalogos e inventario en
-  modo solo lectura. No puede gestionar usuarios, proveedores, ni editar catalogos o
-  recetas de servicio.
+  o elimina ingresos/egresos/depositos, elimina lineas de costo (repone stock
+  automaticamente si era un material), y consulta el Libro diario.
+- **Cajero**: registra ingresos (con factura PDF) aplicando servicios ya definidos,
+  registra egresos y depositos, y consulta los catalogos e inventario en modo solo
+  lectura. No puede gestionar usuarios, proveedores, catalogos, recetas de servicio, ni
+  ver el Libro diario.
 
 ## Flujo de trabajo
 
 1. **Configurar una vez**: se cargan los productos (`Inventario materiales`, con su
-   precio de compra y rendimiento), la mano de obra (`Mano de obra`) y los gastos
-   indirectos (`Gastos indirectos`). Con eso se arma cada **Servicio** (ej. "Corte de
-   Cabello") agregandole su receta de costeo: que materiales usa (y cuantos), que mano
-   de obra y que gastos indirectos, ademas de su precio de venta.
-2. Un usuario abre una caja (`Caja > Abrir caja`) indicando el efectivo inicial.
-3. Mientras la caja este abierta se pueden registrar ingresos, egresos y depositos;
-   quedan asociados a esa sesion de caja.
-4. Al registrar un ingreso, se selecciona el **servicio** prestado (y cuantas veces) -
+   precio de compra y rendimiento), los proveedores y los gastos indirectos. Con eso se
+   arma cada **Servicio** (ej. "Corte de Cabello") agregandole su receta de costeo: que
+   materiales usa (y cuantos) y que gastos indirectos, ademas de su precio de venta. La
+   mano de obra no se agrega a mano: se calcula automaticamente como un porcentaje fijo
+   del precio de venta (30% por defecto, ver `MANO_OBRA_PORCENTAJE` en `config/config.php`).
+2. Los ingresos, egresos y depositos se registran libremente en cualquier momento (no
+   requieren abrir/cerrar una caja).
+3. Al registrar un ingreso, se selecciona el **servicio** prestado (y cuantas veces) -
    el sistema autocompleta el monto sugerido y aplica automaticamente toda la receta de
-   costeo (descontando stock de materiales y calculando la utilidad), sin tener que
-   cargar material por material cada vez. Se pueden aplicar varios servicios a un mismo
-   ingreso desde su detalle.
-5. Al finalizar el turno se cierra la caja (`Caja > Cerrar caja actual`): el sistema
-   calcula el monto esperado (apertura + ingresos - egresos - depositos) y compara
-   contra el efectivo contado, mostrando la diferencia.
-6. El inventario mantiene el costeo por unidad de uso: un producto se compra en una
+   costeo (materiales, gastos indirectos y el 30% de mano de obra), descontando stock y
+   calculando la utilidad, sin tener que cargar material por material cada vez. Se
+   pueden aplicar varios servicios a un mismo ingreso desde su detalle.
+4. El inventario mantiene el costeo por unidad de uso: un producto se compra en una
    unidad (ej. "botella" a $15) pero rinde varias unidades de uso (ej. 20
    "aplicaciones"), y el costo por uso ($0.75) es el que se aplica en las recetas. Las
    entradas de stock (`Inventario materiales > Entrada stock`) registran el proveedor y
    el numero de documento para trazabilidad de compras; el historial completo queda en
    `Inventario materiales > Movimientos`.
+5. El **Libro diario** (`Contabilidad > Libro diario`, solo admin) muestra por rango de
+   fechas: ventas, depositos bancarios, egresos, costo total y utilidad neta por dia, y
+   una tabla de servicios completados en el periodo (cuantas veces se realizo cada uno,
+   ingresos generados y costo).
+
+Las pantallas de caja (`caja/`) siguen existiendo en el codigo por si se necesita
+consultar el historial de sesiones antiguas, pero ya no son parte del flujo diario ni
+aparecen en el menu.
 
 ## Actualizar una instalacion existente
 
@@ -98,13 +105,16 @@ mysql --default-character-set=utf8mb4 -u usuario -p chalimars < database/migrati
 mysql --default-character-set=utf8mb4 -u usuario -p chalimars < database/migrations/003_servicios_costeo_proveedores.sql
 mysql --default-character-set=utf8mb4 -u usuario -p chalimars < database/migrations/004_import_inventario_inicial.sql
 mysql --default-character-set=utf8mb4 -u usuario -p chalimars < database/migrations/005_fix_encoding_utf8.sql
+mysql --default-character-set=utf8mb4 -u usuario -p chalimars < database/migrations/006_libro_diario_mano_obra_30.sql
 ```
 
 La migracion 003 renombra tablas y columnas (`servicios` pasa a ser `mano_obra`, entre
 otros cambios) - respalde la base de datos antes de correrla si tiene datos que le
 importen. La migracion 005 corrige nombres con ñ/tildes que hayan quedado mal
 codificados por no usar `--default-character-set=utf8mb4` al importar (es segura de
-correr aunque sus datos ya esten bien).
+correr aunque sus datos ya esten bien). La migracion 006 elimina las lineas de mano de
+obra que hubiera en recetas de servicio (quedan reemplazadas por el calculo automatico
+del 30%) y crea la tabla `ingresos_servicios` para el libro diario.
 
 ## Despliegue automatico (GitHub Actions + FTP)
 

@@ -14,13 +14,11 @@ if (!$servicio) {
 $stmt = $pdo->prepare("
     SELECT sc.*,
         p.nombre AS producto_nombre, p.unidad_uso AS producto_unidad, p.costo_uso AS producto_costo,
-        mo.nombre AS mano_obra_nombre, mo.costo AS mano_obra_costo,
         gi.nombre AS gasto_nombre, gi.costo_unitario AS gasto_costo
     FROM servicios_costos sc
     LEFT JOIN productos p ON p.id = sc.producto_id
-    LEFT JOIN mano_obra mo ON mo.id = sc.mano_obra_id
     LEFT JOIN gastos_indirectos gi ON gi.id = sc.gasto_indirecto_id
-    WHERE sc.servicio_id = ?
+    WHERE sc.servicio_id = ? AND sc.tipo_costo != 'mano_obra'
     ORDER BY sc.id
 ");
 $stmt->execute([$id]);
@@ -28,18 +26,19 @@ $costos = $stmt->fetchAll();
 
 $totalCosto = 0;
 foreach ($costos as &$c) {
-    $costoUnitario = $c['tipo_costo'] === 'material' ? $c['producto_costo']
-        : ($c['tipo_costo'] === 'mano_obra' ? $c['mano_obra_costo'] : $c['gasto_costo']);
+    $costoUnitario = $c['tipo_costo'] === 'material' ? $c['producto_costo'] : $c['gasto_costo'];
     $c['costo_unitario'] = (float)$costoUnitario;
     $c['costo_total'] = $c['costo_unitario'] * $c['cantidad'];
     $totalCosto += $c['costo_total'];
 }
 unset($c);
 
+$costoManoObra = costo_mano_obra_servicio($servicio['precio_venta']);
+$totalCosto += $costoManoObra;
+
 $utilidad = $servicio['precio_venta'] - $totalCosto;
 
 $productos = $pdo->query('SELECT * FROM productos WHERE activo = 1 ORDER BY nombre')->fetchAll();
-$manoObraCatalogo = $pdo->query('SELECT * FROM mano_obra WHERE activo = 1 ORDER BY nombre')->fetchAll();
 $gastos = $pdo->query('SELECT * FROM gastos_indirectos WHERE activo = 1 ORDER BY nombre')->fetchAll();
 
 $pageTitle = 'Receta de servicio';
@@ -62,14 +61,21 @@ require __DIR__ . '/../includes/header.php';
     <table>
         <thead><tr><th>Tipo</th><th>Concepto</th><th>Cantidad</th><th>Costo unitario</th><th>Costo total</th><?php if (is_admin()): ?><th></th><?php endif; ?></tr></thead>
         <tbody>
+        <tr>
+            <td><span class="tag tag-mano_obra">Mano de obra</span></td>
+            <td>Automatico: <?= (MANO_OBRA_PORCENTAJE * 100) ?>% del precio de venta</td>
+            <td>1</td>
+            <td><?= money($costoManoObra) ?></td>
+            <td><?= money($costoManoObra) ?></td>
+            <?php if (is_admin()): ?><td class="muted">no editable</td><?php endif; ?>
+        </tr>
         <?php foreach ($costos as $c): ?>
             <tr>
                 <td>
                     <?php if ($c['tipo_costo'] === 'material'): ?><span class="tag tag-material">Material</span>
-                    <?php elseif ($c['tipo_costo'] === 'mano_obra'): ?><span class="tag tag-mano_obra">Mano de obra</span>
                     <?php else: ?><span class="tag tag-gasto_indirecto">Gasto indirecto</span><?php endif; ?>
                 </td>
-                <td><?= h($c['producto_nombre'] ?? $c['mano_obra_nombre'] ?? $c['gasto_nombre']) ?></td>
+                <td><?= h($c['producto_nombre'] ?? $c['gasto_nombre']) ?></td>
                 <td><?= h($c['cantidad']) ?><?= $c['tipo_costo'] === 'material' ? ' ' . h($c['producto_unidad']) : '' ?></td>
                 <td><?= money($c['costo_unitario']) ?></td>
                 <td><?= money($c['costo_total']) ?></td>
@@ -87,7 +93,7 @@ require __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
             </tr>
         <?php endforeach; ?>
-        <?php if (!$costos): ?><tr><td colspan="6" class="muted">Esta receta aun no tiene costos definidos.</td></tr><?php endif; ?>
+        <?php if (!$costos): ?><tr><td colspan="6" class="muted">Sin materiales ni gastos indirectos agregados todavia.</td></tr><?php endif; ?>
         </tbody>
     </table>
     </div>
@@ -96,6 +102,7 @@ require __DIR__ . '/../includes/header.php';
 <?php if (is_admin()): ?>
 <div class="panel">
     <h2 class="mt-0">Agregar a la receta</h2>
+    <p class="muted">La mano de obra ya no se agrega aqui: se calcula automaticamente como <?= (MANO_OBRA_PORCENTAJE * 100) ?>% del precio de venta.</p>
     <form method="post" action="<?= BASE_URL ?>servicios/costos.php" id="costo-form">
         <?= csrf_field() ?>
         <input type="hidden" name="servicio_id" value="<?= (int)$servicio['id'] ?>">
@@ -104,7 +111,6 @@ require __DIR__ . '/../includes/header.php';
                 <label>Tipo de costo</label>
                 <select name="tipo_costo" id="tipo_costo" onchange="mostrarBloque(this.value)">
                     <option value="material">Material (inventario)</option>
-                    <option value="mano_obra">Mano de obra</option>
                     <option value="gasto_indirecto">Gasto indirecto</option>
                 </select>
             </div>
@@ -119,16 +125,6 @@ require __DIR__ . '/../includes/header.php';
                 <div class="searchable-select" id="ss-producto">
                     <input type="text" class="ss-input" placeholder="Buscar producto por nombre..." autocomplete="off">
                     <input type="hidden" name="producto_id">
-                    <div class="ss-panel"></div>
-                </div>
-            </div>
-        </div>
-        <div class="form-grid" id="bloque_mano_obra" style="display:none;">
-            <div class="field full">
-                <label>Mano de obra</label>
-                <div class="searchable-select" id="ss-mano-obra">
-                    <input type="text" class="ss-input" placeholder="Buscar mano de obra..." autocomplete="off">
-                    <input type="hidden" name="mano_obra_id">
                     <div class="ss-panel"></div>
                 </div>
             </div>
@@ -152,17 +148,12 @@ require __DIR__ . '/../includes/header.php';
 <script>
 function mostrarBloque(tipo) {
     document.getElementById('bloque_material').style.display = tipo === 'material' ? '' : 'none';
-    document.getElementById('bloque_mano_obra').style.display = tipo === 'mano_obra' ? '' : 'none';
     document.getElementById('bloque_gasto_indirecto').style.display = tipo === 'gasto_indirecto' ? '' : 'none';
 }
 
 new SearchableSelect(document.getElementById('ss-producto'), <?= json_encode(array_map(function ($p) {
     return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'costo por ' . $p['unidad_uso'] . ': ' . money($p['costo_uso']) . ' - stock: ' . $p['stock']];
 }, $productos)) ?>);
-
-new SearchableSelect(document.getElementById('ss-mano-obra'), <?= json_encode(array_map(function ($m) {
-    return ['value' => (string)$m['id'], 'label' => $m['nombre'], 'meta' => 'costo: ' . money($m['costo'])];
-}, $manoObraCatalogo)) ?>);
 
 new SearchableSelect(document.getElementById('ss-gasto'), <?= json_encode(array_map(function ($g) {
     return ['value' => (string)$g['id'], 'label' => $g['nombre'], 'meta' => 'costo: ' . money($g['costo_unitario'])];

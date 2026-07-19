@@ -139,8 +139,10 @@ CREATE TABLE servicios (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Receta de costeo de cada servicio: que materiales, mano de obra y
--- gastos indirectos consume, y en que cantidad.
+-- Receta de costeo de cada servicio: que materiales y gastos
+-- indirectos consume (y en que cantidad). La mano de obra ya NO se
+-- agrega aqui: se calcula automaticamente como 30% del precio_venta
+-- del servicio (ver aplicar_servicio_a_ingreso() en includes/functions.php).
 CREATE TABLE servicios_costos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     servicio_id INT NOT NULL,
@@ -195,6 +197,25 @@ CREATE TABLE ingresos_costos (
     FOREIGN KEY (mano_obra_id) REFERENCES mano_obra(id),
     FOREIGN KEY (gasto_indirecto_id) REFERENCES gastos_indirectos(id),
     FOREIGN KEY (origen_servicio_id) REFERENCES servicios(id),
+    FOREIGN KEY (creado_por) REFERENCES usuarios(id)
+) ENGINE=InnoDB;
+
+-- Registro de cada vez que se aplica un servicio a un ingreso (para el
+-- libro diario / reportes: cuantas veces se realizo cada servicio y
+-- que ingresos/costos genero). Guarda una copia del precio y costo en
+-- ese momento, para que el reporte no cambie si luego se edita el
+-- servicio o sus costos.
+CREATE TABLE ingresos_servicios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ingreso_id INT NOT NULL,
+    servicio_id INT NOT NULL,
+    cantidad DECIMAL(10,2) NOT NULL DEFAULT 1,
+    precio_venta_aplicado DECIMAL(12,2) NOT NULL,
+    costo_total_aplicado DECIMAL(12,2) NOT NULL,
+    creado_por INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ingreso_id) REFERENCES ingresos(id) ON DELETE CASCADE,
+    FOREIGN KEY (servicio_id) REFERENCES servicios(id),
     FOREIGN KEY (creado_por) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 

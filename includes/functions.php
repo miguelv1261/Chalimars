@@ -105,10 +105,22 @@ function darken_hex($hex, $percent = 0.15) {
 }
 
 /**
+ * Calcula el costo de mano de obra de un servicio: un porcentaje fijo
+ * (MANO_OBRA_PORCENTAJE) de su precio de venta. Ya no se elige de un
+ * catalogo al armar la receta.
+ */
+function costo_mano_obra_servicio($precioVenta) {
+    return round((float)$precioVenta * MANO_OBRA_PORCENTAJE, 2);
+}
+
+/**
  * Aplica la receta de costeo de un servicio a un ingreso: por cada linea
- * de servicios_costos crea la linea correspondiente en ingresos_costos,
- * descontando stock de inventario cuando corresponde. Todo o nada:
- * si falta stock de algun material, revierte y lanza RuntimeException.
+ * de materiales/gastos indirectos de servicios_costos crea la linea
+ * correspondiente en ingresos_costos (descontando stock cuando aplica),
+ * y agrega automaticamente una linea de mano de obra igual al 30% del
+ * precio de venta del servicio. Ademas registra la aplicacion en
+ * ingresos_servicios (para el libro diario). Todo o nada: si falta
+ * stock de algun material, revierte todo y lanza RuntimeException.
  */
 function aplicar_servicio_a_ingreso(PDO $pdo, int $servicioId, int $ingresoId, float $cantidadAplicaciones, int $usuarioId) {
     $stmt = $pdo->prepare('SELECT * FROM servicios WHERE id = ?');
@@ -118,12 +130,14 @@ function aplicar_servicio_a_ingreso(PDO $pdo, int $servicioId, int $ingresoId, f
         throw new RuntimeException('Servicio no encontrado.');
     }
 
-    $stmt = $pdo->prepare('SELECT * FROM servicios_costos WHERE servicio_id = ?');
+    $stmt = $pdo->prepare("SELECT * FROM servicios_costos WHERE servicio_id = ? AND tipo_costo != 'mano_obra'");
     $stmt->execute([$servicioId]);
     $lineas = $stmt->fetchAll();
 
     $pdo->beginTransaction();
     try {
+        $costoTotalAplicado = 0;
+
         foreach ($lineas as $linea) {
             $cantidad = round($linea['cantidad'] * $cantidadAplicaciones, 2);
 
@@ -139,6 +153,7 @@ function aplicar_servicio_a_ingreso(PDO $pdo, int $servicioId, int $ingresoId, f
                 }
                 $costoUnitario = (float)$producto['costo_uso'];
                 $costoTotal = round($cantidad * $costoUnitario, 2);
+                $costoTotalAplicado += $costoTotal;
 
                 $pdo->prepare('INSERT INTO ingresos_costos (ingreso_id, tipo_costo, producto_id, origen_servicio_id, cantidad, costo_unitario, costo_total, creado_por) VALUES (?,?,?,?,?,?,?,?)')
                     ->execute([$ingresoId, 'material', $producto['id'], $servicioId, $cantidad, $costoUnitario, $costoTotal, $usuarioId]);
@@ -147,19 +162,6 @@ function aplicar_servicio_a_ingreso(PDO $pdo, int $servicioId, int $ingresoId, f
 
                 $pdo->prepare('INSERT INTO productos_movimientos (producto_id, tipo, cantidad, costo_unitario, costo_total, motivo, ingreso_id, usuario_id) VALUES (?,?,?,?,?,?,?,?)')
                     ->execute([$producto['id'], 'salida', $cantidad, $costoUnitario, $costoTotal, 'Uso en servicio "' . $servicio['nombre'] . '" - Ingreso #' . $ingresoId, $ingresoId, $usuarioId]);
-
-            } elseif ($linea['tipo_costo'] === 'mano_obra') {
-                $stmt = $pdo->prepare('SELECT * FROM mano_obra WHERE id = ?');
-                $stmt->execute([$linea['mano_obra_id']]);
-                $manoObra = $stmt->fetch();
-                if (!$manoObra) {
-                    throw new RuntimeException('Una mano de obra de la receta ya no existe.');
-                }
-                $costoUnitario = (float)$manoObra['costo'];
-                $costoTotal = round($cantidad * $costoUnitario, 2);
-
-                $pdo->prepare('INSERT INTO ingresos_costos (ingreso_id, tipo_costo, mano_obra_id, origen_servicio_id, cantidad, costo_unitario, costo_total, creado_por) VALUES (?,?,?,?,?,?,?,?)')
-                    ->execute([$ingresoId, 'mano_obra', $manoObra['id'], $servicioId, $cantidad, $costoUnitario, $costoTotal, $usuarioId]);
 
             } else {
                 $stmt = $pdo->prepare('SELECT * FROM gastos_indirectos WHERE id = ?');
@@ -170,11 +172,25 @@ function aplicar_servicio_a_ingreso(PDO $pdo, int $servicioId, int $ingresoId, f
                 }
                 $costoUnitario = (float)$gasto['costo_unitario'];
                 $costoTotal = round($cantidad * $costoUnitario, 2);
+                $costoTotalAplicado += $costoTotal;
 
                 $pdo->prepare('INSERT INTO ingresos_costos (ingreso_id, tipo_costo, gasto_indirecto_id, origen_servicio_id, cantidad, costo_unitario, costo_total, creado_por) VALUES (?,?,?,?,?,?,?,?)')
                     ->execute([$ingresoId, 'gasto_indirecto', $gasto['id'], $servicioId, $cantidad, $costoUnitario, $costoTotal, $usuarioId]);
             }
         }
+
+        // Mano de obra: 30% del precio de venta del servicio (no viene de un catalogo)
+        $costoManoObraUnitario = costo_mano_obra_servicio($servicio['precio_venta']);
+        $costoManoObraTotal = round($costoManoObraUnitario * $cantidadAplicaciones, 2);
+        $costoTotalAplicado += $costoManoObraTotal;
+
+        $pdo->prepare('INSERT INTO ingresos_costos (ingreso_id, tipo_costo, origen_servicio_id, cantidad, costo_unitario, costo_total, creado_por) VALUES (?,?,?,?,?,?,?)')
+            ->execute([$ingresoId, 'mano_obra', $servicioId, $cantidadAplicaciones, $costoManoObraUnitario, $costoManoObraTotal, $usuarioId]);
+
+        $precioVentaAplicado = round((float)$servicio['precio_venta'] * $cantidadAplicaciones, 2);
+        $pdo->prepare('INSERT INTO ingresos_servicios (ingreso_id, servicio_id, cantidad, precio_venta_aplicado, costo_total_aplicado, creado_por) VALUES (?,?,?,?,?,?)')
+            ->execute([$ingresoId, $servicioId, $cantidadAplicaciones, $precioVentaAplicado, $costoTotalAplicado, $usuarioId]);
+
         $pdo->commit();
     } catch (Exception $e) {
         $pdo->rollBack();

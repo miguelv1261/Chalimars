@@ -20,8 +20,6 @@ if ($id) {
         redirect(BASE_URL . 'ingresos/index.php');
     }
     $ingreso = $found;
-} else {
-    $sesion = require_caja_abierta($pdo);
 }
 
 $servicios = $pdo->query('SELECT * FROM servicios WHERE activo = 1 ORDER BY nombre')->fetchAll();
@@ -65,8 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $servicioId = (int)($_POST['servicio_id'] ?? 0) ?: null;
             $cantidadServicio = (float)($_POST['cantidad_servicio'] ?? 1) ?: 1;
 
-            $stmt = $pdo->prepare('INSERT INTO ingresos (fecha, cliente, descripcion, monto, numero_factura, factura_pdf, caja_sesion_id, creado_por) VALUES (?,?,?,?,?,?,?,?)');
-            $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, $sesion['id'], current_user()['id']]);
+            $stmt = $pdo->prepare('INSERT INTO ingresos (fecha, cliente, descripcion, monto, numero_factura, factura_pdf, creado_por) VALUES (?,?,?,?,?,?,?)');
+            $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, current_user()['id']]);
             $newId = (int)$pdo->lastInsertId();
 
             if ($servicioId) {

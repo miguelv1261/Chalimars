@@ -3,7 +3,6 @@ require_once __DIR__ . '/includes/bootstrap.php';
 require_login();
 
 $pageTitle = 'Panel';
-$sesion = caja_abierta($pdo);
 
 $hoy = date('Y-m-d');
 
@@ -29,16 +28,6 @@ require __DIR__ . '/includes/header.php';
 
 <div class="summary-cards">
     <div class="card">
-        <div class="label">Estado de caja</div>
-        <div class="value" style="font-size:16px;">
-            <?php if ($sesion): ?>
-                <span class="badge badge-open">Abierta</span>
-            <?php else: ?>
-                <span class="badge badge-closed">Cerrada</span>
-            <?php endif; ?>
-        </div>
-    </div>
-    <div class="card">
         <div class="label">Ingresos de hoy</div>
         <div class="value"><?= money($ingresosHoy['total']) ?></div>
         <div class="muted"><?= (int)$ingresosHoy['cantidad'] ?> registro(s)</div>
@@ -58,14 +47,9 @@ require __DIR__ . '/includes/header.php';
 <div class="panel">
     <h2 class="mt-0">Accesos rapidos</h2>
     <div class="actions">
-        <?php if (!$sesion): ?>
-            <a class="btn" href="<?= BASE_URL ?>caja/abrir.php">Abrir caja</a>
-        <?php else: ?>
-            <a class="btn" href="<?= BASE_URL ?>ingresos/form.php">Registrar ingreso</a>
-            <a class="btn" href="<?= BASE_URL ?>egresos/form.php">Registrar egreso</a>
-            <a class="btn" href="<?= BASE_URL ?>depositos/form.php">Registrar deposito</a>
-            <a class="btn btn-secondary" href="<?= BASE_URL ?>caja/cerrar.php">Cerrar caja</a>
-        <?php endif; ?>
+        <a class="btn" href="<?= BASE_URL ?>ingresos/form.php">Registrar ingreso</a>
+        <a class="btn" href="<?= BASE_URL ?>egresos/form.php">Registrar egreso</a>
+        <a class="btn" href="<?= BASE_URL ?>depositos/form.php">Registrar deposito</a>
     </div>
 </div>
 
