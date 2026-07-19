@@ -60,6 +60,8 @@ function render_nav_link($item, $currentDir, $currentFile) {
         BASE_URL, h($item['url']), $active ? 'active' : '', $item['icon'], h($item['label'])
     );
 }
+$cssPath = BASE_PATH . '/assets/css/style.css';
+$cssVersion = file_exists($cssPath) ? filemtime($cssPath) : time();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -67,7 +69,7 @@ function render_nav_link($item, $currentDir, $currentFile) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= h($pageTitle) ?> - <?= h($config['nombre_negocio']) ?></title>
-<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css?v=<?= $cssVersion ?>">
 <script src="<?= BASE_URL ?>assets/js/app.js"></script>
 <style>
 :root {
