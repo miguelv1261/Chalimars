@@ -9,13 +9,16 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <h1>Usuarios</h1>
-    <a class="btn" href="<?= BASE_URL ?>usuarios/form.php">Nuevo usuario</a>
+    <div class="actions">
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>usuarios/export.php">Exportar a Excel</a>
+        <a class="btn" href="<?= BASE_URL ?>usuarios/form.php">Nuevo usuario</a>
+    </div>
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap" data-table>
 <table>
     <thead>
-    <tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr>
+    <tr><th>Nombre</th><th>Usuario</th><th data-filter>Rol</th><th data-filter>Estado</th><th>Acciones</th></tr>
     </thead>
     <tbody>
     <?php foreach ($usuarios as $u): ?>

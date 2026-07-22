@@ -11,7 +11,7 @@ if (!$ingreso) {
     redirect(BASE_URL . 'ingresos/index.php');
 }
 
-$stmt = $pdo->prepare("SELECT ic.*, p.nombre AS producto_nombre, p.unidad_uso AS producto_unidad,
+$stmt = $pdo->prepare("SELECT ic.*, p.nombre AS producto_nombre,
         mo.nombre AS mano_obra_nombre, g.nombre AS gasto_nombre, sv.nombre AS origen_servicio_nombre
     FROM ingresos_costos ic
     LEFT JOIN productos p ON p.id = ic.producto_id
@@ -23,10 +23,19 @@ $stmt = $pdo->prepare("SELECT ic.*, p.nombre AS producto_nombre, p.unidad_uso AS
 $stmt->execute([$id]);
 $costos = $stmt->fetchAll();
 
-$totalCosto = array_sum(array_column($costos, 'costo_total'));
+$stmt = $pdo->prepare("SELECT ip.*, p.nombre AS producto_nombre
+    FROM ingresos_productos ip
+    JOIN productos p ON p.id = ip.producto_id
+    WHERE ip.ingreso_id = ?
+    ORDER BY ip.id");
+$stmt->execute([$id]);
+$productosVendidos = $stmt->fetchAll();
+
+$totalCosto = array_sum(array_column($costos, 'costo_total')) + array_sum(array_column($productosVendidos, 'costo_total_aplicado'));
 $utilidad = $ingreso['monto'] - $totalCosto;
 
 $servicios = $pdo->query('SELECT * FROM servicios WHERE activo = 1 ORDER BY nombre')->fetchAll();
+$productosActivos = $pdo->query('SELECT * FROM productos WHERE activo = 1 ORDER BY nombre')->fetchAll();
 
 $pageTitle = 'Detalle de ingreso';
 require __DIR__ . '/../includes/header.php';
@@ -50,7 +59,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="panel">
     <h2 class="mt-0">Detalle de costos</h2>
-    <div class="table-wrap">
+    <div class="table-wrap" data-table>
     <table>
         <thead><tr><th>Tipo</th><th>Concepto</th><th>Servicio de origen</th><th>Cantidad</th><th>Costo unitario</th><th>Costo total</th><?php if (is_admin()): ?><th></th><?php endif; ?></tr></thead>
         <tbody>
@@ -85,6 +94,37 @@ require __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="panel">
+    <h2 class="mt-0">Productos vendidos</h2>
+    <div class="table-wrap" data-table>
+    <table>
+        <thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th>Costo</th><?php if (is_admin()): ?><th></th><?php endif; ?></tr></thead>
+        <tbody>
+        <?php foreach ($productosVendidos as $pv): ?>
+            <tr>
+                <td><?= h($pv['producto_nombre']) ?></td>
+                <td><?= h($pv['cantidad']) ?></td>
+                <td><?= money($pv['precio_unitario_aplicado']) ?></td>
+                <td><?= money($pv['subtotal_aplicado']) ?></td>
+                <td><?= money($pv['costo_total_aplicado']) ?></td>
+                <?php if (is_admin()): ?>
+                <td>
+                    <form class="inline" method="post" action="<?= BASE_URL ?>ingresos/delete_producto.php" onsubmit="return confirm('Eliminar esta venta de producto? Se repondra el stock.');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="id" value="<?= (int)$pv['id'] ?>">
+                        <input type="hidden" name="ingreso_id" value="<?= (int)$ingreso['id'] ?>">
+                        <button type="submit" class="btn-icon btn-icon-danger" title="Eliminar"><?= icon_svg('trash') ?></button>
+                    </form>
+                </td>
+                <?php endif; ?>
+            </tr>
+        <?php endforeach; ?>
+        <?php if (!$productosVendidos): ?><tr><td colspan="6" class="muted">Sin productos vendidos todavia.</td></tr><?php endif; ?>
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="panel">
     <h2 class="mt-0">Aplicar un servicio</h2>
     <p class="muted">Selecciona un servicio ya definido (con su receta de materiales, mano de obra y gastos indirectos) y se costeara automaticamente.</p>
     <form method="post" action="<?= BASE_URL ?>ingresos/aplicar_servicio.php">
@@ -111,5 +151,38 @@ require __DIR__ . '/../includes/header.php';
         </div>
     </form>
 </div>
+
+<div class="panel">
+    <h2 class="mt-0">Vender un producto</h2>
+    <p class="muted">Vende un producto directamente (sin pasar por la receta de un servicio): descuenta stock y suma su costo a este ingreso.</p>
+    <form method="post" action="<?= BASE_URL ?>ingresos/aplicar_producto.php">
+        <?= csrf_field() ?>
+        <input type="hidden" name="ingreso_id" value="<?= (int)$ingreso['id'] ?>">
+        <div class="form-grid">
+            <div class="field full">
+                <label>Producto</label>
+                <div class="searchable-select" id="ss-producto-venta">
+                    <input type="text" class="ss-input" placeholder="Buscar producto por nombre..." autocomplete="off">
+                    <input type="hidden" name="producto_id">
+                    <div class="ss-panel"></div>
+                </div>
+            </div>
+            <div class="field">
+                <label>Cantidad (unidades de uso)</label>
+                <input type="number" step="0.01" min="0.01" name="cantidad" value="1" required>
+            </div>
+        </div>
+        <div class="actions" style="margin-top:16px;">
+            <button type="submit" class="btn">Vender producto</button>
+            <?php if (!$productosActivos): ?><span class="muted">No hay productos activos. <a href="<?= BASE_URL ?>productos/form.php">Crear uno</a>.</span><?php endif; ?>
+        </div>
+    </form>
+</div>
+
+<script>
+new SearchableSelect(document.getElementById('ss-producto-venta'), <?= json_encode(array_map(function ($p) {
+    return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'precio ' . money($p['precio_venta_uso']) . ' - stock uso: ' . $p['stock_uso']];
+}, $productosActivos)) ?>);
+</script>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

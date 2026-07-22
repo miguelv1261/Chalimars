@@ -9,10 +9,13 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <h1>Egresos</h1>
-    <a class="btn" href="<?= BASE_URL ?>egresos/form.php">Nuevo egreso</a>
+    <div class="actions">
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>egresos/export.php">Exportar a Excel</a>
+        <a class="btn" href="<?= BASE_URL ?>egresos/form.php">Nuevo egreso</a>
+    </div>
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap" data-table>
 <table>
     <thead>
     <tr><th>Fecha</th><th>Descripcion</th><th>Documento</th><th>Monto</th><th>Archivo</th><?php if (is_admin()): ?><th></th><?php endif; ?></tr>

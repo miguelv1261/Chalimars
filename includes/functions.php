@@ -114,6 +114,67 @@ function costo_mano_obra_servicio($precioVenta) {
 }
 
 /**
+ * Descuenta stock de un producto en unidades de uso, de forma atomica
+ * (FOR UPDATE) y manteniendo el invariante stock_uso = stock_tangible *
+ * rendimiento (stock_tangible es la fuente de verdad). Registra el
+ * movimiento de salida en productos_movimientos. Debe llamarse dentro de
+ * una transaccion ya abierta por el caller. Lanza RuntimeException si el
+ * producto no existe o no hay stock suficiente. Retorna la fila del
+ * producto (previa al descuento).
+ */
+function descontar_stock_producto(PDO $pdo, int $productoId, float $cantidadUso, string $motivo, ?int $ingresoId, int $usuarioId): array {
+    $stmt = $pdo->prepare('SELECT * FROM productos WHERE id = ? FOR UPDATE');
+    $stmt->execute([$productoId]);
+    $producto = $stmt->fetch();
+    if (!$producto) {
+        throw new RuntimeException('El producto ya no existe.');
+    }
+    if ($producto['stock_uso'] < $cantidadUso) {
+        throw new RuntimeException('Stock insuficiente de "' . $producto['nombre'] . '". Disponible: ' . $producto['stock_uso']);
+    }
+
+    $nuevoStockUso = round($producto['stock_uso'] - $cantidadUso, 2);
+    $nuevoStockTangible = $producto['rendimiento'] > 0
+        ? round($producto['stock_tangible'] - ($cantidadUso / $producto['rendimiento']), 2)
+        : $producto['stock_tangible'];
+    $pdo->prepare('UPDATE productos SET stock_uso = ?, stock_tangible = ? WHERE id = ?')
+        ->execute([$nuevoStockUso, $nuevoStockTangible, $productoId]);
+
+    $costoUnitario = (float)$producto['costo_uso'];
+    $costoTotal = round($cantidadUso * $costoUnitario, 2);
+    $pdo->prepare('INSERT INTO productos_movimientos (producto_id, tipo, cantidad, costo_unitario, costo_total, motivo, ingreso_id, usuario_id) VALUES (?,?,?,?,?,?,?,?)')
+        ->execute([$productoId, 'salida', $cantidadUso, $costoUnitario, $costoTotal, $motivo, $ingresoId, $usuarioId]);
+
+    return $producto;
+}
+
+/**
+ * Inverso de descontar_stock_producto(): repone stock (entrada) manteniendo
+ * el mismo invariante stock_uso/stock_tangible. Se usa al eliminar una
+ * linea de costo o de venta de producto ya aplicada a un ingreso.
+ */
+function reponer_stock_producto(PDO $pdo, int $productoId, float $cantidadUso, string $motivo, ?int $ingresoId, int $usuarioId): void {
+    $stmt = $pdo->prepare('SELECT * FROM productos WHERE id = ? FOR UPDATE');
+    $stmt->execute([$productoId]);
+    $producto = $stmt->fetch();
+    if (!$producto) {
+        return;
+    }
+
+    $nuevoStockUso = round($producto['stock_uso'] + $cantidadUso, 2);
+    $nuevoStockTangible = $producto['rendimiento'] > 0
+        ? round($producto['stock_tangible'] + ($cantidadUso / $producto['rendimiento']), 2)
+        : $producto['stock_tangible'];
+    $pdo->prepare('UPDATE productos SET stock_uso = ?, stock_tangible = ? WHERE id = ?')
+        ->execute([$nuevoStockUso, $nuevoStockTangible, $productoId]);
+
+    $costoUnitario = (float)$producto['costo_uso'];
+    $costoTotal = round($cantidadUso * $costoUnitario, 2);
+    $pdo->prepare('INSERT INTO productos_movimientos (producto_id, tipo, cantidad, costo_unitario, costo_total, motivo, ingreso_id, usuario_id) VALUES (?,?,?,?,?,?,?,?)')
+        ->execute([$productoId, 'entrada', $cantidadUso, $costoUnitario, $costoTotal, $motivo, $ingresoId, $usuarioId]);
+}
+
+/**
  * Aplica la receta de costeo de un servicio a un ingreso: por cada linea
  * de materiales/gastos indirectos de servicios_costos crea la linea
  * correspondiente en ingresos_costos (descontando stock cuando aplica),
@@ -142,26 +203,17 @@ function aplicar_servicio_a_ingreso(PDO $pdo, int $servicioId, int $ingresoId, f
             $cantidad = round($linea['cantidad'] * $cantidadAplicaciones, 2);
 
             if ($linea['tipo_costo'] === 'material') {
-                $stmt = $pdo->prepare('SELECT * FROM productos WHERE id = ? FOR UPDATE');
-                $stmt->execute([$linea['producto_id']]);
-                $producto = $stmt->fetch();
-                if (!$producto) {
-                    throw new RuntimeException('Un material de la receta ya no existe.');
-                }
-                if ($producto['stock'] < $cantidad) {
-                    throw new RuntimeException('Stock insuficiente de "' . $producto['nombre'] . '". Disponible: ' . $producto['stock'] . ' ' . $producto['unidad_uso']);
-                }
+                $producto = descontar_stock_producto(
+                    $pdo, (int)$linea['producto_id'], $cantidad,
+                    'Uso en servicio "' . $servicio['nombre'] . '" - Ingreso #' . $ingresoId,
+                    $ingresoId, $usuarioId
+                );
                 $costoUnitario = (float)$producto['costo_uso'];
                 $costoTotal = round($cantidad * $costoUnitario, 2);
                 $costoTotalAplicado += $costoTotal;
 
                 $pdo->prepare('INSERT INTO ingresos_costos (ingreso_id, tipo_costo, producto_id, origen_servicio_id, cantidad, costo_unitario, costo_total, creado_por) VALUES (?,?,?,?,?,?,?,?)')
                     ->execute([$ingresoId, 'material', $producto['id'], $servicioId, $cantidad, $costoUnitario, $costoTotal, $usuarioId]);
-
-                $pdo->prepare('UPDATE productos SET stock = stock - ? WHERE id = ?')->execute([$cantidad, $producto['id']]);
-
-                $pdo->prepare('INSERT INTO productos_movimientos (producto_id, tipo, cantidad, costo_unitario, costo_total, motivo, ingreso_id, usuario_id) VALUES (?,?,?,?,?,?,?,?)')
-                    ->execute([$producto['id'], 'salida', $cantidad, $costoUnitario, $costoTotal, 'Uso en servicio "' . $servicio['nombre'] . '" - Ingreso #' . $ingresoId, $ingresoId, $usuarioId]);
 
             } else {
                 $stmt = $pdo->prepare('SELECT * FROM gastos_indirectos WHERE id = ?');
@@ -190,6 +242,37 @@ function aplicar_servicio_a_ingreso(PDO $pdo, int $servicioId, int $ingresoId, f
         $precioVentaAplicado = round((float)$servicio['precio_venta'] * $cantidadAplicaciones, 2);
         $pdo->prepare('INSERT INTO ingresos_servicios (ingreso_id, servicio_id, cantidad, precio_venta_aplicado, costo_total_aplicado, creado_por) VALUES (?,?,?,?,?,?)')
             ->execute([$ingresoId, $servicioId, $cantidadAplicaciones, $precioVentaAplicado, $costoTotalAplicado, $usuarioId]);
+
+        $pdo->commit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+}
+
+/**
+ * Vende un producto directamente en un ingreso (fuera de la receta de un
+ * servicio, ej. venta de un shampoo en el mostrador): descuenta stock y
+ * registra la linea en ingresos_productos con el precio de venta y el
+ * costo aplicados en ese momento. Todo o nada: si no hay stock suficiente,
+ * revierte todo y lanza RuntimeException.
+ */
+function aplicar_producto_a_ingreso(PDO $pdo, int $productoId, int $ingresoId, float $cantidad, int $usuarioId) {
+    $pdo->beginTransaction();
+    try {
+        $producto = descontar_stock_producto(
+            $pdo, $productoId, $cantidad,
+            'Venta directa - Ingreso #' . $ingresoId,
+            $ingresoId, $usuarioId
+        );
+
+        $costoUnitario = (float)$producto['costo_uso'];
+        $costoTotal = round($cantidad * $costoUnitario, 2);
+        $precioUnitario = (float)$producto['precio_venta_uso'];
+        $subtotal = round($cantidad * $precioUnitario, 2);
+
+        $pdo->prepare('INSERT INTO ingresos_productos (ingreso_id, producto_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado, subtotal_aplicado, costo_total_aplicado, creado_por) VALUES (?,?,?,?,?,?,?,?)')
+            ->execute([$ingresoId, $productoId, $cantidad, $precioUnitario, $costoUnitario, $subtotal, $costoTotal, $usuarioId]);
 
         $pdo->commit();
     } catch (Exception $e) {
@@ -233,4 +316,23 @@ function handle_upload($inputName, $destDir, array $allowedExt = ['pdf', 'jpg', 
         throw new RuntimeException('No se pudo guardar el archivo subido.');
     }
     return $newName;
+}
+
+/**
+ * Envia $rows como un archivo CSV descargable (BOM UTF-8 y separador ";"
+ * para que Excel en espanol reconozca acentos y columnas) y termina la
+ * ejecucion. $headers es la fila de encabezado; cada elemento de $rows es
+ * un array indexado con los mismos valores/orden que $headers.
+ */
+function export_csv(string $filename, array $headers, array $rows): void {
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    echo "\xEF\xBB\xBF";
+    $out = fopen('php://output', 'w');
+    fputcsv($out, $headers, ';');
+    foreach ($rows as $row) {
+        fputcsv($out, $row, ';');
+    }
+    fclose($out);
+    exit;
 }

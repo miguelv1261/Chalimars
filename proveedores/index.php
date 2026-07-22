@@ -9,13 +9,16 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <h1>Proveedores</h1>
-    <a class="btn" href="<?= BASE_URL ?>proveedores/form.php">Nuevo proveedor</a>
+    <div class="actions">
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>proveedores/export.php">Exportar a Excel</a>
+        <a class="btn" href="<?= BASE_URL ?>proveedores/form.php">Nuevo proveedor</a>
+    </div>
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap" data-table>
 <table>
     <thead>
-    <tr><th>Nombre</th><th>Contacto</th><th>Telefono</th><th>Email</th><th>Estado</th><th>Acciones</th></tr>
+    <tr><th>Nombre</th><th>Contacto</th><th>Telefono</th><th>Email</th><th data-filter>Estado</th><th>Acciones</th></tr>
     </thead>
     <tbody>
     <?php foreach ($proveedores as $p): ?>

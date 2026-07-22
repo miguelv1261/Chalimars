@@ -33,16 +33,19 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <h1>Servicios</h1>
-    <?php if (is_admin()): ?>
-        <a class="btn" href="<?= BASE_URL ?>servicios/form.php">Nuevo servicio</a>
-    <?php endif; ?>
+    <div class="actions">
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>servicios/export.php">Exportar a Excel</a>
+        <?php if (is_admin()): ?>
+            <a class="btn" href="<?= BASE_URL ?>servicios/form.php">Nuevo servicio</a>
+        <?php endif; ?>
+    </div>
 </div>
 <p class="muted">Cada servicio trae su receta de costeo predefinida (materiales, mano de obra, gastos indirectos). Al registrar un ingreso solo se selecciona el servicio.</p>
 
-<div class="table-wrap">
+<div class="table-wrap" data-table>
 <table>
     <thead>
-    <tr><th>Servicio</th><th>Precio de venta</th><th>Costo receta</th><th>Utilidad</th><th>Estado</th><th>Acciones</th></tr>
+    <tr><th>Servicio</th><th>Precio de venta</th><th>Costo receta</th><th>Utilidad</th><th data-filter>Estado</th><th>Acciones</th></tr>
     </thead>
     <tbody>
     <?php foreach ($servicios as $s): $utilidad = $s['precio_venta'] - $s['costo_total']; ?>

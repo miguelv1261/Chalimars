@@ -18,7 +18,7 @@ $depositosHoy = $pdo->prepare('SELECT COALESCE(SUM(monto),0) total, COUNT(*) can
 $depositosHoy->execute([$hoy]);
 $depositosHoy = $depositosHoy->fetch();
 
-$stockBajo = $pdo->query('SELECT * FROM productos WHERE activo = 1 AND stock <= stock_minimo ORDER BY nombre')->fetchAll();
+$stockBajo = $pdo->query('SELECT * FROM productos WHERE activo = 1 AND stock_uso <= stock_minimo ORDER BY nombre')->fetchAll();
 
 require __DIR__ . '/includes/header.php';
 ?>
@@ -58,13 +58,13 @@ require __DIR__ . '/includes/header.php';
     <h2 class="mt-0">Alerta de inventario bajo</h2>
     <div class="table-wrap">
     <table>
-        <thead><tr><th>Producto</th><th>Stock actual</th><th>Stock minimo</th></tr></thead>
+        <thead><tr><th>Producto</th><th>Stock actual (uso)</th><th>Stock minimo</th></tr></thead>
         <tbody>
         <?php foreach ($stockBajo as $p): ?>
             <tr>
                 <td><?= h($p['nombre']) ?></td>
-                <td><?= h($p['stock']) ?> <?= h($p['unidad_uso']) ?></td>
-                <td><?= h($p['stock_minimo']) ?> <?= h($p['unidad_uso']) ?></td>
+                <td><?= h($p['stock_uso']) ?></td>
+                <td><?= h($p['stock_minimo']) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

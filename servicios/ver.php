@@ -13,7 +13,7 @@ if (!$servicio) {
 
 $stmt = $pdo->prepare("
     SELECT sc.*,
-        p.nombre AS producto_nombre, p.unidad_uso AS producto_unidad, p.costo_uso AS producto_costo,
+        p.nombre AS producto_nombre, p.costo_uso AS producto_costo,
         gi.nombre AS gasto_nombre, gi.costo_unitario AS gasto_costo
     FROM servicios_costos sc
     LEFT JOIN productos p ON p.id = sc.producto_id
@@ -57,7 +57,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="panel">
     <h2 class="mt-0">Receta de costeo</h2>
-    <div class="table-wrap">
+    <div class="table-wrap" data-table>
     <table>
         <thead><tr><th>Tipo</th><th>Concepto</th><th>Cantidad</th><th>Costo unitario</th><th>Costo total</th><?php if (is_admin()): ?><th></th><?php endif; ?></tr></thead>
         <tbody>
@@ -76,7 +76,7 @@ require __DIR__ . '/../includes/header.php';
                     <?php else: ?><span class="tag tag-gasto_indirecto">Gasto indirecto</span><?php endif; ?>
                 </td>
                 <td><?= h($c['producto_nombre'] ?? $c['gasto_nombre']) ?></td>
-                <td><?= h($c['cantidad']) ?><?= $c['tipo_costo'] === 'material' ? ' ' . h($c['producto_unidad']) : '' ?></td>
+                <td><?= h($c['cantidad']) ?></td>
                 <td><?= money($c['costo_unitario']) ?></td>
                 <td><?= money($c['costo_total']) ?></td>
                 <?php if (is_admin()): ?>
@@ -152,7 +152,7 @@ function mostrarBloque(tipo) {
 }
 
 new SearchableSelect(document.getElementById('ss-producto'), <?= json_encode(array_map(function ($p) {
-    return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'costo por ' . $p['unidad_uso'] . ': ' . money($p['costo_uso']) . ' - stock: ' . $p['stock']];
+    return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'costo por uso: ' . money($p['costo_uso']) . ' - stock: ' . $p['stock_uso']];
 }, $productos)) ?>);
 
 new SearchableSelect(document.getElementById('ss-gasto'), <?= json_encode(array_map(function ($g) {

@@ -71,6 +71,7 @@ $cssVersion = file_exists($cssPath) ? filemtime($cssPath) : time();
 <title><?= h($pageTitle) ?> - <?= h($config['nombre_negocio']) ?></title>
 <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/style.css?v=<?= $cssVersion ?>">
 <script src="<?= BASE_URL ?>assets/js/app.js"></script>
+<script src="<?= BASE_URL ?>assets/js/datatable.js"></script>
 <style>
 :root {
     --primary: <?= h($config['color_primario']) ?>;

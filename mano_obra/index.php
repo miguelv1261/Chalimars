@@ -9,16 +9,19 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <h1>Mano de obra</h1>
-    <?php if (is_admin()): ?>
-        <a class="btn" href="<?= BASE_URL ?>mano_obra/form.php">Nueva tarifa</a>
-    <?php endif; ?>
+    <div class="actions">
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>mano_obra/export.php">Exportar a Excel</a>
+        <?php if (is_admin()): ?>
+            <a class="btn" href="<?= BASE_URL ?>mano_obra/form.php">Nueva tarifa</a>
+        <?php endif; ?>
+    </div>
 </div>
 <p class="muted">Catalogo de tarifas de trabajo que se usan al armar la receta de costeo de cada servicio.</p>
 
-<div class="table-wrap">
+<div class="table-wrap" data-table>
 <table>
     <thead>
-    <tr><th>Nombre</th><th>Descripcion</th><th>Costo</th><th>Estado</th><?php if (is_admin()): ?><th>Acciones</th><?php endif; ?></tr>
+    <tr><th>Nombre</th><th>Descripcion</th><th>Costo</th><th data-filter>Estado</th><?php if (is_admin()): ?><th>Acciones</th><?php endif; ?></tr>
     </thead>
     <tbody>
     <?php foreach ($manoObra as $m): ?>

@@ -67,6 +67,9 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <h1>Libro diario</h1>
+    <div class="actions">
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>contabilidad/export.php?desde=<?= h($fechaDesde) ?>&hasta=<?= h($fechaHasta) ?>">Exportar a Excel</a>
+    </div>
 </div>
 
 <div class="panel">
@@ -96,7 +99,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="panel">
     <h2 class="mt-0">Movimientos por dia</h2>
     <p class="muted">Utilidad neta = ventas - costo de servicios - egresos. Los depositos son solo traslado de efectivo al banco, no afectan la utilidad.</p>
-    <div class="table-wrap">
+    <div class="table-wrap" data-table>
     <table>
         <thead><tr><th>Fecha</th><th>Ventas</th><th>Depositos banco</th><th>Egresos</th><th>Costo</th><th>Utilidad</th></tr></thead>
         <tbody>
@@ -118,7 +121,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="panel">
     <h2 class="mt-0">Servicios completados en el periodo</h2>
-    <div class="table-wrap">
+    <div class="table-wrap" data-table>
     <table>
         <thead><tr><th>Servicio</th><th>Cantidad realizada</th><th>Ingresos generados</th><th>Costo</th><th>Utilidad</th></tr></thead>
         <tbody>
