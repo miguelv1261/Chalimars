@@ -54,24 +54,25 @@ CREATE TABLE proveedores (
 -- ============================================================
 -- Inventario de materiales (control de costos)
 --
--- Un producto se COMPRA en una unidad (unidad_compra, ej. "botella")
--- a un precio_compra (ej. $15) pero RINDE varias unidades de uso
--- (unidad_uso, ej. "aplicacion") segun "rendimiento" (ej. 20).
--- El stock se controla en unidades de uso (lo que realmente se
--- descuenta al costear un servicio) y costo_uso = precio_compra /
--- rendimiento es lo que se usa para costear (ej. $15 / 20 = $0.75
--- por aplicacion).
+-- Un producto se COMPRA en una unidad tangible (ej. una botella) a un
+-- precio_compra (ej. $15) pero RINDE varias unidades de uso segun
+-- "rendimiento" (ej. 20). stock_tangible es la fuente de verdad (lo
+-- comprado); stock_uso siempre se recalcula como stock_tangible *
+-- rendimiento. costo_uso = precio_compra / rendimiento es lo que se usa
+-- para costear (ej. $15 / 20 = $0.75 por uso). precio_venta_uso es el
+-- precio al que se vende cada unidad de uso cuando el producto se vende
+-- directamente en un ingreso (no como parte de la receta de un servicio).
 -- ============================================================
 CREATE TABLE productos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
     nombre VARCHAR(150) NOT NULL,
-    unidad_compra VARCHAR(20) NOT NULL DEFAULT 'unidad',
-    unidad_uso VARCHAR(20) NOT NULL DEFAULT 'unidad',
     rendimiento DECIMAL(10,2) NOT NULL DEFAULT 1,
     precio_compra DECIMAL(10,2) NOT NULL DEFAULT 0,
     costo_uso DECIMAL(10,2) NOT NULL DEFAULT 0,
-    stock DECIMAL(10,2) NOT NULL DEFAULT 0,
+    stock_tangible DECIMAL(10,2) NOT NULL DEFAULT 0,
+    precio_venta_uso DECIMAL(10,2) NOT NULL DEFAULT 0,
+    stock_uso DECIMAL(10,2) NOT NULL DEFAULT 0,
     stock_minimo DECIMAL(10,2) NOT NULL DEFAULT 0,
     activo TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -216,6 +217,25 @@ CREATE TABLE ingresos_servicios (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ingreso_id) REFERENCES ingresos(id) ON DELETE CASCADE,
     FOREIGN KEY (servicio_id) REFERENCES servicios(id),
+    FOREIGN KEY (creado_por) REFERENCES usuarios(id)
+) ENGINE=InnoDB;
+
+-- Registro de cada vez que se vende un producto directamente en un
+-- ingreso (sin pasar por la receta de un servicio). Paralelo a
+-- ingresos_servicios: guarda copia del precio de venta y costo aplicados.
+CREATE TABLE ingresos_productos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ingreso_id INT NOT NULL,
+    producto_id INT NOT NULL,
+    cantidad DECIMAL(10,2) NOT NULL DEFAULT 1,
+    precio_unitario_aplicado DECIMAL(10,2) NOT NULL,
+    costo_unitario_aplicado DECIMAL(10,2) NOT NULL,
+    subtotal_aplicado DECIMAL(12,2) NOT NULL,
+    costo_total_aplicado DECIMAL(12,2) NOT NULL,
+    creado_por INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ingreso_id) REFERENCES ingresos(id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES productos(id),
     FOREIGN KEY (creado_por) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 

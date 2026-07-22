@@ -58,6 +58,7 @@ function SearchableSelect(container, items, options) {
     function select(item) {
         hidden.value = item.value;
         input.value = item.label;
+        hidden.dispatchEvent(new Event('change'));
         close();
     }
 

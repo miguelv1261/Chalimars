@@ -289,6 +289,46 @@ tbody tr:last-child td { border-bottom: none; }
 
 .table-wrap table { border-radius: var(--radius-lg); overflow: hidden; }
 
+/* ---------- Barra de herramientas de tabla (buscar / filtrar / ordenar) ---------- */
+
+.table-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.table-toolbar .table-search {
+    flex: 1 1 220px;
+    min-width: 180px;
+}
+
+.table-toolbar .table-filter {
+    flex: 0 1 200px;
+}
+
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+th.sortable:hover { color: var(--text); }
+
+th.sortable .sort-arrow {
+    display: inline-block;
+    width: 10px;
+    margin-left: 4px;
+    opacity: 0.35;
+}
+
+th.sortable .sort-arrow::after { content: '\2195'; }
+
+th.sortable.sorted-asc .sort-arrow { opacity: 1; }
+th.sortable.sorted-asc .sort-arrow::after { content: '\2191'; }
+th.sortable.sorted-desc .sort-arrow { opacity: 1; }
+th.sortable.sorted-desc .sort-arrow::after { content: '\2193'; }
+
 /* ---------- Buttons ---------- */
 
 .btn {

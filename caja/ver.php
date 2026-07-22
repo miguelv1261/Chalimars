@@ -52,7 +52,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="panel">
     <h2 class="mt-0">Ingresos</h2>
-    <div class="table-wrap">
+    <div class="table-wrap" data-table>
     <table>
         <thead><tr><th>Fecha</th><th>Cliente</th><th>Descripcion</th><th>Monto</th><th>Factura</th></tr></thead>
         <tbody>
@@ -73,7 +73,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="panel">
     <h2 class="mt-0">Egresos</h2>
-    <div class="table-wrap">
+    <div class="table-wrap" data-table>
     <table>
         <thead><tr><th>Fecha</th><th>Descripcion</th><th>Documento</th><th>Monto</th><th>Archivo</th></tr></thead>
         <tbody>
@@ -94,7 +94,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="panel">
     <h2 class="mt-0">Depositos</h2>
-    <div class="table-wrap">
+    <div class="table-wrap" data-table>
     <table>
         <thead><tr><th>Fecha</th><th>Banco</th><th>Referencia</th><th>Monto</th><th>Comprobante</th></tr></thead>
         <tbody>

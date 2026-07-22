@@ -17,9 +17,11 @@ $costo = $stmt->fetch();
 if ($costo) {
     $pdo->beginTransaction();
     if ($costo['tipo_costo'] === 'material' && $costo['producto_id']) {
-        $pdo->prepare('UPDATE productos SET stock = stock + ? WHERE id = ?')->execute([$costo['cantidad'], $costo['producto_id']]);
-        $pdo->prepare('INSERT INTO productos_movimientos (producto_id, tipo, cantidad, costo_unitario, costo_total, motivo, ingreso_id, usuario_id) VALUES (?,?,?,?,?,?,?,?)')
-            ->execute([$costo['producto_id'], 'entrada', $costo['cantidad'], $costo['costo_unitario'], $costo['costo_total'], 'Reverso de costo eliminado - Ingreso #' . $ingresoId, $ingresoId, current_user()['id']]);
+        reponer_stock_producto(
+            $pdo, (int)$costo['producto_id'], (float)$costo['cantidad'],
+            'Reverso de costo eliminado - Ingreso #' . $ingresoId,
+            $ingresoId, current_user()['id']
+        );
     }
     $pdo->prepare('DELETE FROM ingresos_costos WHERE id = ?')->execute([$id]);
     $pdo->commit();

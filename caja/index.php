@@ -13,18 +13,21 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <h1>Sesiones de caja</h1>
-    <?php $abierta = caja_abierta($pdo); ?>
-    <?php if (!$abierta): ?>
-        <a class="btn" href="<?= BASE_URL ?>caja/abrir.php">Abrir caja</a>
-    <?php else: ?>
-        <a class="btn btn-secondary" href="<?= BASE_URL ?>caja/cerrar.php">Cerrar caja actual</a>
-    <?php endif; ?>
+    <div class="actions">
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>caja/export.php">Exportar a Excel</a>
+        <?php $abierta = caja_abierta($pdo); ?>
+        <?php if (!$abierta): ?>
+            <a class="btn" href="<?= BASE_URL ?>caja/abrir.php">Abrir caja</a>
+        <?php else: ?>
+            <a class="btn btn-secondary" href="<?= BASE_URL ?>caja/cerrar.php">Cerrar caja actual</a>
+        <?php endif; ?>
+    </div>
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap" data-table>
 <table>
     <thead>
-    <tr><th>#</th><th>Apertura</th><th>Cierre</th><th>Monto apertura</th><th>Monto contado</th><th>Diferencia</th><th>Estado</th><th>Abierta por</th><th></th></tr>
+    <tr><th>#</th><th>Apertura</th><th>Cierre</th><th>Monto apertura</th><th>Monto contado</th><th>Diferencia</th><th data-filter>Estado</th><th>Abierta por</th><th></th></tr>
     </thead>
     <tbody>
     <?php foreach ($sesiones as $s): ?>

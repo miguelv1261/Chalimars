@@ -30,13 +30,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
-        $cantidadUso = round($cantidadCompra * $producto['rendimiento'], 2);
         $costoUso = round($precioCompraUnitario / $producto['rendimiento'], 4);
+        $nuevoStockTangible = round((float)$producto['stock_tangible'] + $cantidadCompra, 2);
+        $nuevoStockUso = round($nuevoStockTangible * $producto['rendimiento'], 2);
+        $cantidadUso = round($nuevoStockUso - (float)$producto['stock_uso'], 2);
         $costoTotal = round($cantidadUso * $costoUso, 2);
 
         $pdo->beginTransaction();
-        $pdo->prepare('UPDATE productos SET stock = stock + ?, precio_compra = ?, costo_uso = ? WHERE id = ?')
-            ->execute([$cantidadUso, $precioCompraUnitario, $costoUso, $id]);
+        $pdo->prepare('UPDATE productos SET stock_tangible = ?, stock_uso = ?, precio_compra = ?, costo_uso = ? WHERE id = ?')
+            ->execute([$nuevoStockTangible, $nuevoStockUso, $precioCompraUnitario, $costoUso, $id]);
         $pdo->prepare('INSERT INTO productos_movimientos
                 (producto_id, tipo, cantidad, costo_unitario, costo_total, cantidad_compra, precio_compra_unitario, proveedor_id, numero_documento, motivo, usuario_id)
              VALUES (?,?,?,?,?,?,?,?,?,?,?)')
@@ -54,7 +56,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="panel">
     <?php foreach ($errors as $e): ?><div class="alert alert-error"><?= h($e) ?></div><?php endforeach; ?>
-    <p class="muted">Stock actual: <?= h($producto['stock']) ?> <?= h($producto['unidad_uso']) ?> &middot; Rendimiento: 1 <?= h($producto['unidad_compra']) ?> = <?= h($producto['rendimiento']) ?> <?= h($producto['unidad_uso']) ?></p>
+    <p class="muted">Stock actual: <?= h($producto['stock_tangible']) ?> tangible / <?= h($producto['stock_uso']) ?> uso &middot; Rendimiento: 1 unidad = <?= h($producto['rendimiento']) ?> unidades de uso</p>
     <form method="post">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int)$producto['id'] ?>">
@@ -73,11 +75,11 @@ require __DIR__ . '/../includes/header.php';
                 <input type="text" name="numero_documento">
             </div>
             <div class="field">
-                <label>Cantidad comprada (en <?= h($producto['unidad_compra']) ?>)</label>
+                <label>Cantidad comprada (unidades tangibles)</label>
                 <input type="number" step="0.01" min="0.01" name="cantidad_compra" required>
             </div>
             <div class="field">
-                <label>Precio de compra por <?= h($producto['unidad_compra']) ?></label>
+                <label>Precio de compra por unidad</label>
                 <input type="number" step="0.01" min="0" name="precio_compra_unitario" value="<?= h($producto['precio_compra']) ?>" required>
             </div>
             <div class="field full">

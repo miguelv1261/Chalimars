@@ -23,6 +23,7 @@ if ($id) {
 }
 
 $servicios = $pdo->query('SELECT * FROM servicios WHERE activo = 1 ORDER BY nombre')->fetchAll();
+$productosActivos = $pdo->query('SELECT * FROM productos WHERE activo = 1 ORDER BY nombre')->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -62,20 +63,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $servicioId = (int)($_POST['servicio_id'] ?? 0) ?: null;
             $cantidadServicio = (float)($_POST['cantidad_servicio'] ?? 1) ?: 1;
+            $productoId = (int)($_POST['producto_id'] ?? 0) ?: null;
+            $cantidadProducto = (float)($_POST['cantidad_producto'] ?? 1) ?: 1;
 
             $stmt = $pdo->prepare('INSERT INTO ingresos (fecha, cliente, descripcion, monto, numero_factura, factura_pdf, creado_por) VALUES (?,?,?,?,?,?,?)');
             $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, current_user()['id']]);
             $newId = (int)$pdo->lastInsertId();
 
+            $mensajes = [];
             if ($servicioId) {
                 try {
                     aplicar_servicio_a_ingreso($pdo, $servicioId, $newId, $cantidadServicio, current_user()['id']);
-                    flash_set('Ingreso registrado y costeado automaticamente con el servicio seleccionado.');
+                    $mensajes[] = 'el servicio seleccionado';
                 } catch (RuntimeException $e) {
                     flash_set('Ingreso registrado, pero no se pudo aplicar el costeo del servicio: ' . $e->getMessage(), 'error');
                 }
-            } else {
-                flash_set('Ingreso registrado. Ahora puede seleccionar un servicio para costearlo.');
+            }
+            if ($productoId) {
+                try {
+                    aplicar_producto_a_ingreso($pdo, $productoId, $newId, $cantidadProducto, current_user()['id']);
+                    $mensajes[] = 'el producto vendido';
+                } catch (RuntimeException $e) {
+                    flash_set('Ingreso registrado, pero no se pudo vender el producto: ' . $e->getMessage(), 'error');
+                }
+            }
+            if ($mensajes) {
+                flash_set('Ingreso registrado y costeado automaticamente con ' . implode(' y ', $mensajes) . '.');
+            } elseif (!$servicioId && !$productoId) {
+                flash_set('Ingreso registrado. Ahora puede aplicar un servicio o vender un producto para costearlo.');
             }
             redirect(BASE_URL . 'ingresos/ver.php?id=' . $newId);
         }
@@ -96,7 +111,7 @@ require __DIR__ . '/../includes/header.php';
             <div class="field full">
                 <label>Servicio prestado (opcional, autocompleta y costea automaticamente)</label>
                 <select name="servicio_id" id="servicio_id" onchange="autocompletarServicio(this)">
-                    <option value="">-- Sin servicio / costear manualmente despues --</option>
+                    <option value="">-- Sin servicio --</option>
                     <?php foreach ($servicios as $s): ?>
                         <option value="<?= (int)$s['id'] ?>" data-precio="<?= h($s['precio_venta']) ?>" data-nombre="<?= h($s['nombre']) ?>">
                             <?= h($s['nombre']) ?> (<?= money($s['precio_venta']) ?>)
@@ -107,6 +122,18 @@ require __DIR__ . '/../includes/header.php';
             <div class="field">
                 <label>Cantidad del servicio</label>
                 <input type="number" step="1" min="1" name="cantidad_servicio" value="1">
+            </div>
+            <div class="field full">
+                <label>Producto vendido (opcional, se descuenta del inventario)</label>
+                <div class="searchable-select" id="ss-producto">
+                    <input type="text" class="ss-input" placeholder="Buscar producto por nombre..." autocomplete="off">
+                    <input type="hidden" name="producto_id" id="producto_id">
+                    <div class="ss-panel"></div>
+                </div>
+            </div>
+            <div class="field">
+                <label>Cantidad del producto (unidades de uso)</label>
+                <input type="number" step="0.01" min="0.01" name="cantidad_producto" id="cantidad_producto" value="1">
             </div>
             <?php endif; ?>
             <div class="field">
@@ -150,6 +177,28 @@ require __DIR__ . '/../includes/header.php';
         if (!montoInput.value || montoInput.value == '0') { montoInput.value = precio; }
         if (!descInput.value) { descInput.value = nombre; }
     }
+
+    <?php if (!$id): ?>
+    var productosParaVenta = <?= json_encode(array_map(function ($p) {
+        return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'precio ' . money($p['precio_venta_uso']) . ' - stock uso: ' . $p['stock_uso']];
+    }, $productosActivos)) ?>;
+    new SearchableSelect(document.getElementById('ss-producto'), productosParaVenta);
+
+    function sugerirMontoProducto() {
+        var productoId = document.getElementById('producto_id').value;
+        if (!productoId) { return; }
+        var producto = productosParaVenta.find(function (p) { return p.value === productoId; });
+        if (!producto) { return; }
+        var cantidad = parseFloat(document.getElementById('cantidad_producto').value) || 1;
+        var montoInput = document.getElementById('monto');
+        var precioMatch = producto.meta.match(/precio \$([\d.,]+)/);
+        if (precioMatch && (!montoInput.value || montoInput.value == '0')) {
+            montoInput.value = (parseFloat(precioMatch[1].replace(/,/g, '')) * cantidad).toFixed(2);
+        }
+    }
+    document.getElementById('producto_id').addEventListener('change', sugerirMontoProducto);
+    document.getElementById('cantidad_producto').addEventListener('input', sugerirMontoProducto);
+    <?php endif; ?>
     </script>
 </div>
 

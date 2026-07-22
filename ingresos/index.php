@@ -13,10 +13,13 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header">
     <h1>Ingresos</h1>
-    <a class="btn" href="<?= BASE_URL ?>ingresos/form.php">Nuevo ingreso</a>
+    <div class="actions">
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>ingresos/export.php">Exportar a Excel</a>
+        <a class="btn" href="<?= BASE_URL ?>ingresos/form.php">Nuevo ingreso</a>
+    </div>
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap" data-table>
 <table>
     <thead>
     <tr><th>Fecha</th><th>Cliente</th><th>Descripcion</th><th>Monto</th><th>Costo total</th><th>Utilidad</th><th>Factura</th><th>Acciones</th></tr>

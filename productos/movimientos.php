@@ -29,8 +29,12 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="summary-cards">
     <div class="card">
-        <div class="label">Stock actual</div>
-        <div class="value"><?= h($producto['stock']) ?> <?= h($producto['unidad_uso']) ?></div>
+        <div class="label">Stock tangible</div>
+        <div class="value"><?= h($producto['stock_tangible']) ?></div>
+    </div>
+    <div class="card">
+        <div class="label">Stock de uso</div>
+        <div class="value"><?= h($producto['stock_uso']) ?></div>
     </div>
     <div class="card">
         <div class="label">Costo por uso actual</div>
@@ -38,22 +42,22 @@ require __DIR__ . '/../includes/header.php';
     </div>
     <div class="card">
         <div class="label">Precio de compra actual</div>
-        <div class="value"><?= money($producto['precio_compra']) ?> / <?= h($producto['unidad_compra']) ?></div>
+        <div class="value"><?= money($producto['precio_compra']) ?></div>
     </div>
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap" data-table>
 <table>
     <thead>
-    <tr><th>Fecha</th><th>Tipo</th><th>Cantidad (uso)</th><th>Compra</th><th>Proveedor</th><th>Costo unitario</th><th>Costo total</th><th>Motivo</th><th>Usuario</th></tr>
+    <tr><th>Fecha</th><th data-filter>Tipo</th><th>Cantidad (uso)</th><th>Compra</th><th>Proveedor</th><th>Costo unitario</th><th>Costo total</th><th>Motivo</th><th>Usuario</th></tr>
     </thead>
     <tbody>
     <?php foreach ($movimientos as $m): ?>
         <tr>
             <td><?= h(date('d/m/Y H:i', strtotime($m['created_at']))) ?></td>
             <td><?= $m['tipo'] === 'entrada' ? '<span class="tag" style="background:#e6f5ea;color:#1e7d3c;">Entrada</span>' : '<span class="tag" style="background:#fbe9eb;color:#c4293a;">Salida</span>' ?></td>
-            <td><?= h($m['cantidad']) ?> <?= h($producto['unidad_uso']) ?></td>
-            <td><?= $m['cantidad_compra'] !== null ? h($m['cantidad_compra']) . ' ' . h($producto['unidad_compra']) . ' @ ' . money($m['precio_compra_unitario']) : '-' ?></td>
+            <td><?= h($m['cantidad']) ?></td>
+            <td><?= $m['cantidad_compra'] !== null ? h($m['cantidad_compra']) . ' @ ' . money($m['precio_compra_unitario']) : '-' ?></td>
             <td><?= h($m['proveedor_nombre'] ?? '-') ?><?= $m['numero_documento'] ? ' (' . h($m['numero_documento']) . ')' : '' ?></td>
             <td><?= money($m['costo_unitario']) ?></td>
             <td><?= money($m['costo_total']) ?></td>
