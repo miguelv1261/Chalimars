@@ -1,0 +1,210 @@
+From 2a0a5300dded290a8f70370582cc9b43090a7622 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 4 Aug 2026 05:09:40 +0000
+Subject: [PATCH] Permitir agregar materiales de inventario al costeo de
+ ingresos
+
+Ahora, ademas de aplicar un servicio (receta) o vender un producto, se
+puede sumar un material individual del inventario directamente al costeo
+de un ingreso: descuenta stock y suma su costo, sin registrarse como
+venta ni provenir de la receta de ningun servicio. Disponible tanto al
+crear el ingreso como despues, desde su detalle.
+---
+ includes/functions.php        | 30 ++++++++++++++++++++++++++++++
+ ingresos/agregar_material.php | 33 +++++++++++++++++++++++++++++++++
+ ingresos/form.php             | 29 ++++++++++++++++++++++++++++-
+ ingresos/ver.php              | 30 ++++++++++++++++++++++++++++++
+ 4 files changed, 121 insertions(+), 1 deletion(-)
+ create mode 100644 ingresos/agregar_material.php
+
+diff --git a/includes/functions.php b/includes/functions.php
+index cb6b1b6..0e49501 100644
+--- a/includes/functions.php
++++ b/includes/functions.php
+@@ -281,6 +281,36 @@ function aplicar_producto_a_ingreso(PDO $pdo, int $productoId, int $ingresoId, f
+     }
+ }
+ 
++/**
++ * Agrega un material del inventario al costeo de un ingreso fuera de la
++ * receta de un servicio (ej. un insumo puntual que no esta en la receta
++ * predefinida): descuenta stock y crea la linea en ingresos_costos con
++ * origen_servicio_id NULL, ya que no proviene de ninguna receta. A
++ * diferencia de aplicar_producto_a_ingreso(), no registra venta ni precio:
++ * solo suma costo, no es un producto para la venta.
++ */
++function agregar_material_a_ingreso(PDO $pdo, int $productoId, int $ingresoId, float $cantidad, int $usuarioId) {
++    $pdo->beginTransaction();
++    try {
++        $producto = descontar_stock_producto(
++            $pdo, $productoId, $cantidad,
++            'Material adicional al costeo - Ingreso #' . $ingresoId,
++            $ingresoId, $usuarioId
++        );
++
++        $costoUnitario = (float)$producto['costo_uso'];
++        $costoTotal = round($cantidad * $costoUnitario, 2);
++
++        $pdo->prepare('INSERT INTO ingresos_costos (ingreso_id, tipo_costo, producto_id, cantidad, costo_unitario, costo_total, creado_por) VALUES (?,?,?,?,?,?,?)')
++            ->execute([$ingresoId, 'material', $productoId, $cantidad, $costoUnitario, $costoTotal, $usuarioId]);
++
++        $pdo->commit();
++    } catch (Exception $e) {
++        $pdo->rollBack();
++        throw $e;
++    }
++}
++
+ /**
+  * Sube un archivo verificando extension y tamano permitidos.
+  * Retorna el nombre de archivo generado (sin ruta) o null si no se envio archivo.
+diff --git a/ingresos/agregar_material.php b/ingresos/agregar_material.php
+new file mode 100644
+index 0000000..d96a54f
+--- /dev/null
++++ b/ingresos/agregar_material.php
+@@ -0,0 +1,33 @@
++<?php
++require_once __DIR__ . '/../includes/bootstrap.php';
++require_login();
++
++if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
++    redirect(BASE_URL . 'ingresos/index.php');
++}
++csrf_verify();
++
++$ingresoId = (int)($_POST['ingreso_id'] ?? 0);
++$productoId = (int)($_POST['producto_id'] ?? 0);
++$cantidad = (float)($_POST['cantidad'] ?? 1) ?: 1;
++
++$stmt = $pdo->prepare('SELECT id FROM ingresos WHERE id = ?');
++$stmt->execute([$ingresoId]);
++if (!$stmt->fetch()) {
++    flash_set('Ingreso no encontrado.', 'error');
++    redirect(BASE_URL . 'ingresos/index.php');
++}
++
++if (!$productoId) {
++    flash_set('Debe seleccionar un material.', 'error');
++    redirect(BASE_URL . 'ingresos/ver.php?id=' . $ingresoId);
++}
++
++try {
++    agregar_material_a_ingreso($pdo, $productoId, $ingresoId, $cantidad, current_user()['id']);
++    flash_set('Material agregado al costeo correctamente.');
++} catch (RuntimeException $e) {
++    flash_set('No se pudo agregar el material: ' . $e->getMessage(), 'error');
++}
++
++redirect(BASE_URL . 'ingresos/ver.php?id=' . $ingresoId);
+diff --git a/ingresos/form.php b/ingresos/form.php
+index df86c4d..8cf04e9 100644
+--- a/ingresos/form.php
++++ b/ingresos/form.php
+@@ -65,6 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+             $cantidadServicio = (float)($_POST['cantidad_servicio'] ?? 1) ?: 1;
+             $productoId = (int)($_POST['producto_id'] ?? 0) ?: null;
+             $cantidadProducto = (float)($_POST['cantidad_producto'] ?? 1) ?: 1;
++            $materialId = (int)($_POST['material_id'] ?? 0) ?: null;
++            $cantidadMaterial = (float)($_POST['cantidad_material'] ?? 1) ?: 1;
+ 
+             $stmt = $pdo->prepare('INSERT INTO ingresos (fecha, cliente, descripcion, monto, numero_factura, factura_pdf, creado_por) VALUES (?,?,?,?,?,?,?)');
+             $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, current_user()['id']]);
+@@ -87,9 +89,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                     flash_set('Ingreso registrado, pero no se pudo vender el producto: ' . $e->getMessage(), 'error');
+                 }
+             }
++            if ($materialId) {
++                try {
++                    agregar_material_a_ingreso($pdo, $materialId, $newId, $cantidadMaterial, current_user()['id']);
++                    $mensajes[] = 'el material adicional';
++                } catch (RuntimeException $e) {
++                    flash_set('Ingreso registrado, pero no se pudo agregar el material: ' . $e->getMessage(), 'error');
++                }
++            }
+             if ($mensajes) {
+                 flash_set('Ingreso registrado y costeado automaticamente con ' . implode(' y ', $mensajes) . '.');
+-            } elseif (!$servicioId && !$productoId) {
++            } elseif (!$servicioId && !$productoId && !$materialId) {
+                 flash_set('Ingreso registrado. Ahora puede aplicar un servicio o vender un producto para costearlo.');
+             }
+             redirect(BASE_URL . 'ingresos/ver.php?id=' . $newId);
+@@ -135,6 +145,18 @@ require __DIR__ . '/../includes/header.php';
+                 <label>Cantidad del producto (unidades de uso)</label>
+                 <input type="number" step="0.01" min="0.01" name="cantidad_producto" id="cantidad_producto" value="1">
+             </div>
++            <div class="field full">
++                <label>Material adicional (opcional, aparte de la receta - no es venta, solo suma costo y descuenta stock)</label>
++                <div class="searchable-select" id="ss-material">
++                    <input type="text" class="ss-input" placeholder="Buscar material por nombre..." autocomplete="off">
++                    <input type="hidden" name="material_id" id="material_id">
++                    <div class="ss-panel"></div>
++                </div>
++            </div>
++            <div class="field">
++                <label>Cantidad del material (unidades de uso)</label>
++                <input type="number" step="0.01" min="0.01" name="cantidad_material" id="cantidad_material" value="1">
++            </div>
+             <?php endif; ?>
+             <div class="field">
+                 <label>Fecha</label>
+@@ -184,6 +206,11 @@ require __DIR__ . '/../includes/header.php';
+     }, $productosActivos)) ?>;
+     new SearchableSelect(document.getElementById('ss-producto'), productosParaVenta);
+ 
++    var materialesParaCosto = <?= json_encode(array_map(function ($p) {
++        return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'costo uso ' . money($p['costo_uso']) . ' - stock uso: ' . $p['stock_uso']];
++    }, $productosActivos)) ?>;
++    new SearchableSelect(document.getElementById('ss-material'), materialesParaCosto);
++
+     function sugerirMontoProducto() {
+         var productoId = document.getElementById('producto_id').value;
+         if (!productoId) { return; }
+diff --git a/ingresos/ver.php b/ingresos/ver.php
+index 3efb080..7a9a4f6 100644
+--- a/ingresos/ver.php
++++ b/ingresos/ver.php
+@@ -179,10 +179,40 @@ require __DIR__ . '/../includes/header.php';
+     </form>
+ </div>
+ 
++<div class="panel">
++    <h2 class="mt-0">Agregar material extra al costeo</h2>
++    <p class="muted">Suma un material del inventario que se uso aparte de la receta del servicio (no es un producto para la venta): solo se descuenta stock y se suma su costo a este ingreso.</p>
++    <form method="post" action="<?= BASE_URL ?>ingresos/agregar_material.php">
++        <?= csrf_field() ?>
++        <input type="hidden" name="ingreso_id" value="<?= (int)$ingreso['id'] ?>">
++        <div class="form-grid">
++            <div class="field full">
++                <label>Material</label>
++                <div class="searchable-select" id="ss-material-costo">
++                    <input type="text" class="ss-input" placeholder="Buscar material por nombre..." autocomplete="off">
++                    <input type="hidden" name="producto_id">
++                    <div class="ss-panel"></div>
++                </div>
++            </div>
++            <div class="field">
++                <label>Cantidad (unidades de uso)</label>
++                <input type="number" step="0.01" min="0.01" name="cantidad" value="1" required>
++            </div>
++        </div>
++        <div class="actions" style="margin-top:16px;">
++            <button type="submit" class="btn">Agregar material</button>
++            <?php if (!$productosActivos): ?><span class="muted">No hay productos activos. <a href="<?= BASE_URL ?>productos/form.php">Crear uno</a>.</span><?php endif; ?>
++        </div>
++    </form>
++</div>
++
+ <script>
+ new SearchableSelect(document.getElementById('ss-producto-venta'), <?= json_encode(array_map(function ($p) {
+     return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'precio ' . money($p['precio_venta_uso']) . ' - stock uso: ' . $p['stock_uso']];
+ }, $productosActivos)) ?>);
++new SearchableSelect(document.getElementById('ss-material-costo'), <?= json_encode(array_map(function ($p) {
++    return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'costo uso ' . money($p['costo_uso']) . ' - stock uso: ' . $p['stock_uso']];
++}, $productosActivos)) ?>);
+ </script>
+ 
+ <?php require __DIR__ . '/../includes/footer.php'; ?>
+-- 
+2.43.0
+
