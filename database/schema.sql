@@ -7,12 +7,17 @@ USE chalimars;
 -- ============================================================
 -- Usuarios y roles
 -- ============================================================
+-- rol: 'admin' es el uso operativo diario (contador); 'desarrollador' tiene
+-- el mismo acceso completo de administracion, para quien da soporte y
+-- desarrollo (ver is_admin() en includes/auth.php). 'cajero' queda en el
+-- ENUM solo por compatibilidad con datos historicos: ya no se usa ni se
+-- ofrece al crear/editar usuarios.
 CREATE TABLE usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     nombre_completo VARCHAR(150) NOT NULL,
-    rol ENUM('admin','cajero') NOT NULL DEFAULT 'cajero',
+    rol ENUM('admin','desarrollador','cajero') NOT NULL DEFAULT 'admin',
     activo TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -271,6 +276,23 @@ CREATE TABLE depositos (
     creado_por INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (caja_sesion_id) REFERENCES cajas_sesiones(id),
+    FOREIGN KEY (creado_por) REFERENCES usuarios(id)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- Requerimientos: modulo de soporte/programacion. El contador (u otro
+-- usuario) registra un pedido y el desarrollador lo va atendiendo,
+-- actualizando estado y respuesta.
+-- ============================================================
+CREATE TABLE requerimientos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT NOT NULL,
+    estado ENUM('pendiente','en_progreso','completado','rechazado') NOT NULL DEFAULT 'pendiente',
+    respuesta TEXT NULL,
+    creado_por INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (creado_por) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 

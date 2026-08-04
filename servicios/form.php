@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
-require_role(['admin']);
+require_admin();
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
 $servicio = ['id' => null, 'nombre' => '', 'descripcion' => '', 'precio_venta' => ''];

@@ -28,9 +28,32 @@ function require_role(array $roles) {
     }
 }
 
+/**
+ * Devuelve true para 'admin' (el contador, uso operativo diario del
+ * sistema) y para 'desarrollador' (soporte/programacion, con el mismo
+ * acceso completo de administracion). El rol 'cajero' ya no se usa.
+ */
 function is_admin() {
     $user = current_user();
-    return $user && $user['rol'] === 'admin';
+    return $user && in_array($user['rol'], ['admin', 'desarrollador'], true);
+}
+
+/**
+ * Devuelve true solo para el rol 'desarrollador' (soporte/programacion),
+ * usado para el modulo de Requerimientos.
+ */
+function is_dev() {
+    $user = current_user();
+    return $user && $user['rol'] === 'desarrollador';
+}
+
+/**
+ * Restringe la pagina a los roles de administracion del sistema (admin o
+ * desarrollador): equivalente a require_role(['admin', 'desarrollador']),
+ * usado por todo el CRUD operativo (productos, servicios, ingresos, etc.).
+ */
+function require_admin() {
+    require_role(['admin', 'desarrollador']);
 }
 
 /**

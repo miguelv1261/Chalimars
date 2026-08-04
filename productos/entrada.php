@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
-require_role(['admin']);
+require_admin();
 
 $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
 $stmt = $pdo->prepare('SELECT * FROM productos WHERE id = ?');

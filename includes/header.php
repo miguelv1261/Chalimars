@@ -19,6 +19,10 @@ $navItems = [
         'icon' => '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M9 22V12h6v10"></path>'],
 ];
 $navGroups = [
+    'Soporte' => [
+        ['section' => 'requerimientos', 'url' => 'requerimientos/index.php', 'label' => 'Requerimientos',
+            'icon' => '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>'],
+    ],
     'Registros' => [
         ['section' => 'ingresos', 'url' => 'ingresos/index.php', 'label' => 'Ingresos',
             'icon' => '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline>'],

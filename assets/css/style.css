@@ -508,6 +508,11 @@ input[type="checkbox"] { width: auto; }
 .tag-mano_obra { background: #fff3e0; color: #ef6c00; }
 .tag-gasto_indirecto { background: #f3e5f5; color: #6a1b9a; }
 
+.tag-pendiente { background: #eceff1; color: #455a64; }
+.tag-en_progreso { background: #fff3e0; color: #ef6c00; }
+.tag-completado { background: #e8f5e9; color: #1e7d3c; }
+.tag-rechazado { background: #fdecea; color: #c4293a; }
+
 /* ---------- Auth (login) ---------- */
 
 .auth-body {

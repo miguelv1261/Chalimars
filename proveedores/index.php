@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
-require_role(['admin']);
+require_admin();
 
 $pageTitle = 'Proveedores';
 $proveedores = $pdo->query('SELECT * FROM proveedores ORDER BY nombre')->fetchAll();
