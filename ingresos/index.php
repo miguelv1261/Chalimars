@@ -22,7 +22,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="table-wrap" data-table>
 <table>
     <thead>
-    <tr><th>Fecha</th><th>Cliente</th><th>Descripcion</th><th>Monto</th><th>Costo total</th><th>Utilidad</th><th>Factura</th><th>Acciones</th></tr>
+    <tr><th>Fecha</th><th>Cliente</th><th>Descripcion</th><th>Monto</th><th>Costo total</th><th>Utilidad</th><th>Factura</th><th># Asiento</th><th>Acciones</th></tr>
     </thead>
     <tbody>
     <?php foreach ($ingresos as $i): $utilidad = $i['monto'] - $i['total_costo']; ?>
@@ -34,6 +34,7 @@ require __DIR__ . '/../includes/header.php';
             <td><?= money($i['total_costo']) ?></td>
             <td style="color: <?= $utilidad >= 0 ? '#1e7d3c' : '#c4293a' ?>;"><?= money($utilidad) ?></td>
             <td><?= $i['factura_pdf'] ? '<a href="' . BASE_URL . 'uploads/facturas/' . h($i['factura_pdf']) . '" target="_blank">PDF</a>' : '-' ?></td>
+            <td><?= h($i['asiento']) ?></td>
             <td>
                 <div class="action-icons">
                     <a class="btn-icon" href="<?= BASE_URL ?>ingresos/ver.php?id=<?= (int)$i['id'] ?>" title="Ver / Costear"><?= icon_svg('eye') ?></a>
