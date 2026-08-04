@@ -1,0 +1,917 @@
+From 8025d520b675d40a84b4d095ee31959dd9ad300b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 4 Aug 2026 05:34:33 +0000
+Subject: [PATCH] Agregar rol de desarrollador y modulo de Requerimientos
+
+El rol "cajero" ya no se usa; ahora "admin" es el contador (uso operativo
+diario) y se agrega "desarrollador" con el mismo acceso completo de
+administracion (crear/editar/borrar en todo el sistema), para quien da
+soporte y programacion. is_admin() acepta ambos roles y require_role(['admin'])
+se reemplaza por el helper require_admin() en todo el codebase.
+
+Se agrega el modulo Requerimientos para que el contador (o cualquier
+usuario) registre pedidos de soporte/programacion, y el desarrollador
+los atienda actualizando estado y respuesta.
+---
+ assets/css/style.css                          |  5 +
+ configuracion/index.php                       |  2 +-
+ contabilidad/export.php                       |  2 +-
+ contabilidad/index.php                        |  2 +-
+ ...008_rol_desarrollador_y_requerimientos.sql | 25 +++++
+ database/schema.sql                           | 24 ++++-
+ depositos/delete.php                          |  2 +-
+ egresos/delete.php                            |  2 +-
+ gastos_indirectos/delete.php                  |  2 +-
+ gastos_indirectos/form.php                    |  2 +-
+ includes/auth.php                             | 25 ++++-
+ includes/header.php                           |  4 +
+ ingresos/delete_costo.php                     |  2 +-
+ ingresos/delete_producto.php                  |  2 +-
+ ingresos/form.php                             |  2 +-
+ mano_obra/delete.php                          |  2 +-
+ mano_obra/form.php                            |  2 +-
+ productos/delete.php                          |  2 +-
+ productos/entrada.php                         |  2 +-
+ productos/form.php                            |  2 +-
+ proveedores/delete.php                        |  2 +-
+ proveedores/export.php                        |  2 +-
+ proveedores/form.php                          |  2 +-
+ proveedores/index.php                         |  2 +-
+ requerimientos/actualizar.php                 | 36 +++++++
+ requerimientos/delete.php                     | 28 ++++++
+ requerimientos/export.php                     | 21 +++++
+ requerimientos/form.php                       | 77 +++++++++++++++
+ requerimientos/index.php                      | 51 ++++++++++
+ requerimientos/ver.php                        | 94 +++++++++++++++++++
+ servicios/costos.php                          |  2 +-
+ servicios/delete.php                          |  2 +-
+ servicios/delete_costo.php                    |  2 +-
+ servicios/form.php                            |  2 +-
+ usuarios/delete.php                           |  2 +-
+ usuarios/export.php                           |  2 +-
+ usuarios/form.php                             | 13 ++-
+ usuarios/index.php                            |  4 +-
+ 38 files changed, 423 insertions(+), 34 deletions(-)
+ create mode 100644 database/migrations/008_rol_desarrollador_y_requerimientos.sql
+ create mode 100644 requerimientos/actualizar.php
+ create mode 100644 requerimientos/delete.php
+ create mode 100644 requerimientos/export.php
+ create mode 100644 requerimientos/form.php
+ create mode 100644 requerimientos/index.php
+ create mode 100644 requerimientos/ver.php
+
+diff --git a/assets/css/style.css b/assets/css/style.css
+index 3f13432..5aa7863 100644
+--- a/assets/css/style.css
++++ b/assets/css/style.css
+@@ -508,6 +508,11 @@ input[type="checkbox"] { width: auto; }
+ .tag-mano_obra { background: #fff3e0; color: #ef6c00; }
+ .tag-gasto_indirecto { background: #f3e5f5; color: #6a1b9a; }
+ 
++.tag-pendiente { background: #eceff1; color: #455a64; }
++.tag-en_progreso { background: #fff3e0; color: #ef6c00; }
++.tag-completado { background: #e8f5e9; color: #1e7d3c; }
++.tag-rechazado { background: #fdecea; color: #c4293a; }
++
+ /* ---------- Auth (login) ---------- */
+ 
+ .auth-body {
+diff --git a/configuracion/index.php b/configuracion/index.php
+index a706646..e9d2450 100644
+--- a/configuracion/index.php
++++ b/configuracion/index.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $config = get_config($pdo);
+ $errors = [];
+diff --git a/contabilidad/export.php b/contabilidad/export.php
+index 527ad26..aaec1b2 100644
+--- a/contabilidad/export.php
++++ b/contabilidad/export.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $hoy = date('Y-m-d');
+ $fechaDesde = $_GET['desde'] ?? date('Y-m-01');
+diff --git a/contabilidad/index.php b/contabilidad/index.php
+index 9323736..60b1bb2 100644
+--- a/contabilidad/index.php
++++ b/contabilidad/index.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $hoy = date('Y-m-d');
+ $fechaDesde = $_GET['desde'] ?? date('Y-m-01');
+diff --git a/database/migrations/008_rol_desarrollador_y_requerimientos.sql b/database/migrations/008_rol_desarrollador_y_requerimientos.sql
+new file mode 100644
+index 0000000..6ebcaf9
+--- /dev/null
++++ b/database/migrations/008_rol_desarrollador_y_requerimientos.sql
+@@ -0,0 +1,25 @@
++-- Migracion 008: rol "desarrollador" y modulo de Requerimientos.
++--
++-- El rol "cajero" ya no se usa: la operacion diaria del sistema (contador)
++-- usa "admin", y se agrega "desarrollador" para quien da soporte y
++-- desarrollo (mismo acceso completo que "admin", ver is_admin() en
++-- includes/auth.php). No se elimina "cajero" del ENUM para no romper
++-- filas existentes; simplemente ya no aparece como opcion al crear o
++-- editar usuarios.
++ALTER TABLE usuarios
++    MODIFY COLUMN rol ENUM('admin','desarrollador','cajero') NOT NULL DEFAULT 'admin';
++
++-- Modulo de Requerimientos: para que el contador (u otro usuario) pueda
++-- enviar pedidos de soporte/programacion, y el desarrollador los vaya
++-- atendiendo (estado + respuesta).
++CREATE TABLE requerimientos (
++    id INT AUTO_INCREMENT PRIMARY KEY,
++    titulo VARCHAR(200) NOT NULL,
++    descripcion TEXT NOT NULL,
++    estado ENUM('pendiente','en_progreso','completado','rechazado') NOT NULL DEFAULT 'pendiente',
++    respuesta TEXT NULL,
++    creado_por INT NOT NULL,
++    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
++    FOREIGN KEY (creado_por) REFERENCES usuarios(id)
++) ENGINE=InnoDB;
+diff --git a/database/schema.sql b/database/schema.sql
+index a3d651d..7c94ce0 100644
+--- a/database/schema.sql
++++ b/database/schema.sql
+@@ -7,12 +7,17 @@ USE chalimars;
+ -- ============================================================
+ -- Usuarios y roles
+ -- ============================================================
++-- rol: 'admin' es el uso operativo diario (contador); 'desarrollador' tiene
++-- el mismo acceso completo de administracion, para quien da soporte y
++-- desarrollo (ver is_admin() en includes/auth.php). 'cajero' queda en el
++-- ENUM solo por compatibilidad con datos historicos: ya no se usa ni se
++-- ofrece al crear/editar usuarios.
+ CREATE TABLE usuarios (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     username VARCHAR(50) NOT NULL UNIQUE,
+     password VARCHAR(255) NOT NULL,
+     nombre_completo VARCHAR(150) NOT NULL,
+-    rol ENUM('admin','cajero') NOT NULL DEFAULT 'cajero',
++    rol ENUM('admin','desarrollador','cajero') NOT NULL DEFAULT 'admin',
+     activo TINYINT(1) NOT NULL DEFAULT 1,
+     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ ) ENGINE=InnoDB;
+@@ -274,6 +279,23 @@ CREATE TABLE depositos (
+     FOREIGN KEY (creado_por) REFERENCES usuarios(id)
+ ) ENGINE=InnoDB;
+ 
++-- ============================================================
++-- Requerimientos: modulo de soporte/programacion. El contador (u otro
++-- usuario) registra un pedido y el desarrollador lo va atendiendo,
++-- actualizando estado y respuesta.
++-- ============================================================
++CREATE TABLE requerimientos (
++    id INT AUTO_INCREMENT PRIMARY KEY,
++    titulo VARCHAR(200) NOT NULL,
++    descripcion TEXT NOT NULL,
++    estado ENUM('pendiente','en_progreso','completado','rechazado') NOT NULL DEFAULT 'pendiente',
++    respuesta TEXT NULL,
++    creado_por INT NOT NULL,
++    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
++    FOREIGN KEY (creado_por) REFERENCES usuarios(id)
++) ENGINE=InnoDB;
++
+ -- ============================================================
+ -- Configuracion / marca del negocio (logo, nombre, color)
+ -- Siempre una unica fila con id = 1
+diff --git a/depositos/delete.php b/depositos/delete.php
+index eb4b023..924bbc8 100644
+--- a/depositos/delete.php
++++ b/depositos/delete.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'depositos/index.php');
+diff --git a/egresos/delete.php b/egresos/delete.php
+index 79c76b4..26cf718 100644
+--- a/egresos/delete.php
++++ b/egresos/delete.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'egresos/index.php');
+diff --git a/gastos_indirectos/delete.php b/gastos_indirectos/delete.php
+index c0c9925..b164917 100644
+--- a/gastos_indirectos/delete.php
++++ b/gastos_indirectos/delete.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'gastos_indirectos/index.php');
+diff --git a/gastos_indirectos/form.php b/gastos_indirectos/form.php
+index ee7c198..bf5c25b 100644
+--- a/gastos_indirectos/form.php
++++ b/gastos_indirectos/form.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+ $gasto = ['id' => null, 'nombre' => '', 'descripcion' => '', 'costo_unitario' => ''];
+diff --git a/includes/auth.php b/includes/auth.php
+index d09b37b..588633d 100644
+--- a/includes/auth.php
++++ b/includes/auth.php
+@@ -28,9 +28,32 @@ function require_role(array $roles) {
+     }
+ }
+ 
++/**
++ * Devuelve true para 'admin' (el contador, uso operativo diario del
++ * sistema) y para 'desarrollador' (soporte/programacion, con el mismo
++ * acceso completo de administracion). El rol 'cajero' ya no se usa.
++ */
+ function is_admin() {
+     $user = current_user();
+-    return $user && $user['rol'] === 'admin';
++    return $user && in_array($user['rol'], ['admin', 'desarrollador'], true);
++}
++
++/**
++ * Devuelve true solo para el rol 'desarrollador' (soporte/programacion),
++ * usado para el modulo de Requerimientos.
++ */
++function is_dev() {
++    $user = current_user();
++    return $user && $user['rol'] === 'desarrollador';
++}
++
++/**
++ * Restringe la pagina a los roles de administracion del sistema (admin o
++ * desarrollador): equivalente a require_role(['admin', 'desarrollador']),
++ * usado por todo el CRUD operativo (productos, servicios, ingresos, etc.).
++ */
++function require_admin() {
++    require_role(['admin', 'desarrollador']);
+ }
+ 
+ /**
+diff --git a/includes/header.php b/includes/header.php
+index 75e03bb..3ec06b5 100644
+--- a/includes/header.php
++++ b/includes/header.php
+@@ -19,6 +19,10 @@ $navItems = [
+         'icon' => '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M9 22V12h6v10"></path>'],
+ ];
+ $navGroups = [
++    'Soporte' => [
++        ['section' => 'requerimientos', 'url' => 'requerimientos/index.php', 'label' => 'Requerimientos',
++            'icon' => '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>'],
++    ],
+     'Registros' => [
+         ['section' => 'ingresos', 'url' => 'ingresos/index.php', 'label' => 'Ingresos',
+             'icon' => '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline>'],
+diff --git a/ingresos/delete_costo.php b/ingresos/delete_costo.php
+index fcd9d3b..66efdba 100644
+--- a/ingresos/delete_costo.php
++++ b/ingresos/delete_costo.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'ingresos/index.php');
+diff --git a/ingresos/delete_producto.php b/ingresos/delete_producto.php
+index cef8876..8ab9853 100644
+--- a/ingresos/delete_producto.php
++++ b/ingresos/delete_producto.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'ingresos/index.php');
+diff --git a/ingresos/form.php b/ingresos/form.php
+index 8cf04e9..6b1f070 100644
+--- a/ingresos/form.php
++++ b/ingresos/form.php
+@@ -5,7 +5,7 @@ require_login();
+ $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+ 
+ if ($id) {
+-    require_role(['admin']);
++    require_admin();
+ }
+ 
+ $ingreso = ['id' => null, 'fecha' => date('Y-m-d'), 'cliente' => '', 'descripcion' => '', 'monto' => '', 'numero_factura' => ''];
+diff --git a/mano_obra/delete.php b/mano_obra/delete.php
+index ae03d07..caa5fa9 100644
+--- a/mano_obra/delete.php
++++ b/mano_obra/delete.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'mano_obra/index.php');
+diff --git a/mano_obra/form.php b/mano_obra/form.php
+index a11cd66..1bc21ea 100644
+--- a/mano_obra/form.php
++++ b/mano_obra/form.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+ $manoObra = ['id' => null, 'nombre' => '', 'descripcion' => '', 'costo' => ''];
+diff --git a/productos/delete.php b/productos/delete.php
+index 621bfe7..ab6d6f8 100644
+--- a/productos/delete.php
++++ b/productos/delete.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'productos/index.php');
+diff --git a/productos/entrada.php b/productos/entrada.php
+index 5c83b02..6af9d5f 100644
+--- a/productos/entrada.php
++++ b/productos/entrada.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+ $stmt = $pdo->prepare('SELECT * FROM productos WHERE id = ?');
+diff --git a/productos/form.php b/productos/form.php
+index fbfc667..13f6085 100644
+--- a/productos/form.php
++++ b/productos/form.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+ $producto = [
+diff --git a/proveedores/delete.php b/proveedores/delete.php
+index 15eece4..5d1485e 100644
+--- a/proveedores/delete.php
++++ b/proveedores/delete.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'proveedores/index.php');
+diff --git a/proveedores/export.php b/proveedores/export.php
+index 4de4e59..f98e398 100644
+--- a/proveedores/export.php
++++ b/proveedores/export.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $proveedores = $pdo->query('SELECT * FROM proveedores ORDER BY nombre')->fetchAll();
+ 
+diff --git a/proveedores/form.php b/proveedores/form.php
+index 3125d25..0e3c7b0 100644
+--- a/proveedores/form.php
++++ b/proveedores/form.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+ $proveedor = ['id' => null, 'nombre' => '', 'contacto' => '', 'telefono' => '', 'email' => '', 'direccion' => ''];
+diff --git a/proveedores/index.php b/proveedores/index.php
+index c4b58a9..d4fa050 100644
+--- a/proveedores/index.php
++++ b/proveedores/index.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $pageTitle = 'Proveedores';
+ $proveedores = $pdo->query('SELECT * FROM proveedores ORDER BY nombre')->fetchAll();
+diff --git a/requerimientos/actualizar.php b/requerimientos/actualizar.php
+new file mode 100644
+index 0000000..f20ca53
+--- /dev/null
++++ b/requerimientos/actualizar.php
+@@ -0,0 +1,36 @@
++<?php
++require_once __DIR__ . '/../includes/bootstrap.php';
++require_login();
++if (!is_dev()) {
++    http_response_code(403);
++    require BASE_PATH . '/includes/403.php';
++    exit;
++}
++
++if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
++    redirect(BASE_URL . 'requerimientos/index.php');
++}
++csrf_verify();
++
++$id = (int)($_POST['id'] ?? 0);
++$estado = $_POST['estado'] ?? '';
++$respuesta = trim($_POST['respuesta'] ?? '');
++$estadosValidos = ['pendiente', 'en_progreso', 'completado', 'rechazado'];
++
++if (!in_array($estado, $estadosValidos, true)) {
++    flash_set('Estado invalido.', 'error');
++    redirect(BASE_URL . 'requerimientos/ver.php?id=' . $id);
++}
++
++$stmt = $pdo->prepare('SELECT id FROM requerimientos WHERE id = ?');
++$stmt->execute([$id]);
++if (!$stmt->fetch()) {
++    flash_set('Requerimiento no encontrado.', 'error');
++    redirect(BASE_URL . 'requerimientos/index.php');
++}
++
++$pdo->prepare('UPDATE requerimientos SET estado=?, respuesta=? WHERE id=?')
++    ->execute([$estado, $respuesta !== '' ? $respuesta : null, $id]);
++
++flash_set('Requerimiento actualizado correctamente.');
++redirect(BASE_URL . 'requerimientos/ver.php?id=' . $id);
+diff --git a/requerimientos/delete.php b/requerimientos/delete.php
+new file mode 100644
+index 0000000..4f286f5
+--- /dev/null
++++ b/requerimientos/delete.php
+@@ -0,0 +1,28 @@
++<?php
++require_once __DIR__ . '/../includes/bootstrap.php';
++require_login();
++
++if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
++    redirect(BASE_URL . 'requerimientos/index.php');
++}
++csrf_verify();
++
++$id = (int)($_POST['id'] ?? 0);
++$stmt = $pdo->prepare('SELECT * FROM requerimientos WHERE id = ?');
++$stmt->execute([$id]);
++$requerimiento = $stmt->fetch();
++
++if (!$requerimiento) {
++    flash_set('Requerimiento no encontrado.', 'error');
++    redirect(BASE_URL . 'requerimientos/index.php');
++}
++
++$puedeEliminar = is_dev() || ($requerimiento['creado_por'] == current_user()['id'] && $requerimiento['estado'] === 'pendiente');
++if (!$puedeEliminar) {
++    flash_set('No tiene permiso para eliminar este requerimiento.', 'error');
++    redirect(BASE_URL . 'requerimientos/ver.php?id=' . $id);
++}
++
++$pdo->prepare('DELETE FROM requerimientos WHERE id = ?')->execute([$id]);
++flash_set('Requerimiento eliminado correctamente.');
++redirect(BASE_URL . 'requerimientos/index.php');
+diff --git a/requerimientos/export.php b/requerimientos/export.php
+new file mode 100644
+index 0000000..e77550f
+--- /dev/null
++++ b/requerimientos/export.php
+@@ -0,0 +1,21 @@
++<?php
++require_once __DIR__ . '/../includes/bootstrap.php';
++require_login();
++
++$requerimientos = $pdo->query("SELECT r.*, u.nombre_completo AS creado_por_nombre
++    FROM requerimientos r
++    JOIN usuarios u ON u.id = r.creado_por
++    ORDER BY r.created_at DESC")->fetchAll();
++
++$estadoLabel = [
++    'pendiente' => 'Pendiente',
++    'en_progreso' => 'En progreso',
++    'completado' => 'Completado',
++    'rechazado' => 'Rechazado',
++];
++
++$rows = array_map(function ($r) use ($estadoLabel) {
++    return [$r['titulo'], $r['descripcion'], $estadoLabel[$r['estado']] ?? $r['estado'], $r['respuesta'], $r['creado_por_nombre'], $r['created_at']];
++}, $requerimientos);
++
++export_csv('requerimientos.csv', ['Titulo', 'Descripcion', 'Estado', 'Respuesta', 'Creado por', 'Fecha'], $rows);
+diff --git a/requerimientos/form.php b/requerimientos/form.php
+new file mode 100644
+index 0000000..19208b4
+--- /dev/null
++++ b/requerimientos/form.php
+@@ -0,0 +1,77 @@
++<?php
++require_once __DIR__ . '/../includes/bootstrap.php';
++require_login();
++
++$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
++$requerimiento = ['id' => null, 'titulo' => '', 'descripcion' => ''];
++$errors = [];
++
++if ($id) {
++    $stmt = $pdo->prepare('SELECT * FROM requerimientos WHERE id = ?');
++    $stmt->execute([$id]);
++    $found = $stmt->fetch();
++    if (!$found) {
++        flash_set('Requerimiento no encontrado.', 'error');
++        redirect(BASE_URL . 'requerimientos/index.php');
++    }
++    // Solo el desarrollador, o quien lo creo mientras siga pendiente, puede editar el texto.
++    $puedeEditar = is_dev() || ($found['creado_por'] == current_user()['id'] && $found['estado'] === 'pendiente');
++    if (!$puedeEditar) {
++        flash_set('Ya no se puede editar este requerimiento.', 'error');
++        redirect(BASE_URL . 'requerimientos/ver.php?id=' . $id);
++    }
++    $requerimiento = $found;
++}
++
++if ($_SERVER['REQUEST_METHOD'] === 'POST') {
++    csrf_verify();
++    $requerimiento['titulo'] = trim($_POST['titulo'] ?? '');
++    $requerimiento['descripcion'] = trim($_POST['descripcion'] ?? '');
++
++    if ($requerimiento['titulo'] === '' || $requerimiento['descripcion'] === '') {
++        $errors[] = 'El titulo y la descripcion son obligatorios.';
++    }
++
++    if (!$errors) {
++        if ($id) {
++            $stmt = $pdo->prepare('UPDATE requerimientos SET titulo=?, descripcion=? WHERE id=?');
++            $stmt->execute([$requerimiento['titulo'], $requerimiento['descripcion'], $id]);
++            flash_set('Requerimiento actualizado correctamente.');
++            redirect(BASE_URL . 'requerimientos/ver.php?id=' . $id);
++        } else {
++            $stmt = $pdo->prepare('INSERT INTO requerimientos (titulo, descripcion, creado_por) VALUES (?,?,?)');
++            $stmt->execute([$requerimiento['titulo'], $requerimiento['descripcion'], current_user()['id']]);
++            $newId = (int)$pdo->lastInsertId();
++            flash_set('Requerimiento enviado correctamente.');
++            redirect(BASE_URL . 'requerimientos/ver.php?id=' . $newId);
++        }
++    }
++}
++
++$pageTitle = $id ? 'Editar requerimiento' : 'Nuevo requerimiento';
++require __DIR__ . '/../includes/header.php';
++?>
++<div class="page-header"><h1><?= h($pageTitle) ?></h1></div>
++
++<div class="panel">
++    <?php foreach ($errors as $e): ?><div class="alert alert-error"><?= h($e) ?></div><?php endforeach; ?>
++    <form method="post">
++        <?= csrf_field() ?>
++        <div class="form-grid">
++            <div class="field full">
++                <label>Titulo</label>
++                <input type="text" name="titulo" value="<?= h($requerimiento['titulo']) ?>" required>
++            </div>
++            <div class="field full">
++                <label>Descripcion (que necesitas, para que sirve, y cualquier detalle util)</label>
++                <textarea name="descripcion" rows="6" required><?= h($requerimiento['descripcion']) ?></textarea>
++            </div>
++        </div>
++        <div class="actions" style="margin-top:16px;">
++            <button type="submit" class="btn">Guardar</button>
++            <a class="btn btn-secondary" href="<?= BASE_URL ?>requerimientos/index.php">Cancelar</a>
++        </div>
++    </form>
++</div>
++
++<?php require __DIR__ . '/../includes/footer.php'; ?>
+diff --git a/requerimientos/index.php b/requerimientos/index.php
+new file mode 100644
+index 0000000..1d29671
+--- /dev/null
++++ b/requerimientos/index.php
+@@ -0,0 +1,51 @@
++<?php
++require_once __DIR__ . '/../includes/bootstrap.php';
++require_login();
++
++$pageTitle = 'Requerimientos';
++$requerimientos = $pdo->query("SELECT r.*, u.nombre_completo AS creado_por_nombre
++    FROM requerimientos r
++    JOIN usuarios u ON u.id = r.creado_por
++    ORDER BY r.created_at DESC")->fetchAll();
++
++$estadoLabel = [
++    'pendiente' => 'Pendiente',
++    'en_progreso' => 'En progreso',
++    'completado' => 'Completado',
++    'rechazado' => 'Rechazado',
++];
++
++require __DIR__ . '/../includes/header.php';
++?>
++<div class="page-header">
++    <h1>Requerimientos</h1>
++    <div class="actions">
++        <a class="btn btn-secondary" href="<?= BASE_URL ?>requerimientos/export.php">Exportar a Excel</a>
++        <a class="btn" href="<?= BASE_URL ?>requerimientos/form.php">Nuevo requerimiento</a>
++    </div>
++</div>
++<p class="muted">Registra aqui pedidos de soporte o de programacion (cambios, correcciones, nuevas necesidades del sistema) para que el desarrollador los atienda.</p>
++
++<div class="table-wrap" data-table>
++<table>
++    <thead>
++    <tr><th>Titulo</th><th>Creado por</th><th data-filter>Estado</th><th>Fecha</th><th></th></tr>
++    </thead>
++    <tbody>
++    <?php foreach ($requerimientos as $r): ?>
++        <tr>
++            <td><?= h($r['titulo']) ?></td>
++            <td><?= h($r['creado_por_nombre']) ?></td>
++            <td><span class="tag tag-<?= h($r['estado']) ?>"><?= h($estadoLabel[$r['estado']] ?? $r['estado']) ?></span></td>
++            <td><?= h(date('d/m/Y', strtotime($r['created_at']))) ?></td>
++            <td>
++                <a class="btn-icon" href="<?= BASE_URL ?>requerimientos/ver.php?id=<?= (int)$r['id'] ?>" title="Ver detalle"><?= icon_svg('eye') ?></a>
++            </td>
++        </tr>
++    <?php endforeach; ?>
++    <?php if (!$requerimientos): ?><tr><td colspan="5" class="muted">Sin requerimientos registrados todavia.</td></tr><?php endif; ?>
++    </tbody>
++</table>
++</div>
++
++<?php require __DIR__ . '/../includes/footer.php'; ?>
+diff --git a/requerimientos/ver.php b/requerimientos/ver.php
+new file mode 100644
+index 0000000..31a739d
+--- /dev/null
++++ b/requerimientos/ver.php
+@@ -0,0 +1,94 @@
++<?php
++require_once __DIR__ . '/../includes/bootstrap.php';
++require_login();
++
++$id = (int)($_GET['id'] ?? 0);
++$stmt = $pdo->prepare('SELECT r.*, u.nombre_completo AS creado_por_nombre
++    FROM requerimientos r
++    JOIN usuarios u ON u.id = r.creado_por
++    WHERE r.id = ?');
++$stmt->execute([$id]);
++$requerimiento = $stmt->fetch();
++if (!$requerimiento) {
++    flash_set('Requerimiento no encontrado.', 'error');
++    redirect(BASE_URL . 'requerimientos/index.php');
++}
++
++$estadoLabel = [
++    'pendiente' => 'Pendiente',
++    'en_progreso' => 'En progreso',
++    'completado' => 'Completado',
++    'rechazado' => 'Rechazado',
++];
++
++$puedeEditar = is_dev() || ($requerimiento['creado_por'] == current_user()['id'] && $requerimiento['estado'] === 'pendiente');
++
++$pageTitle = 'Requerimiento #' . $requerimiento['id'];
++require __DIR__ . '/../includes/header.php';
++?>
++<div class="page-header">
++    <h1>Requerimiento #<?= (int)$requerimiento['id'] ?> - <?= h($requerimiento['titulo']) ?></h1>
++    <a class="btn btn-secondary" href="<?= BASE_URL ?>requerimientos/index.php">Volver</a>
++</div>
++
++<div class="summary-cards">
++    <div class="card"><div class="label">Estado</div><div class="value" style="font-size:16px;"><span class="tag tag-<?= h($requerimiento['estado']) ?>"><?= h($estadoLabel[$requerimiento['estado']] ?? $requerimiento['estado']) ?></span></div></div>
++    <div class="card"><div class="label">Creado por</div><div class="value" style="font-size:16px;"><?= h($requerimiento['creado_por_nombre']) ?></div></div>
++    <div class="card"><div class="label">Fecha</div><div class="value" style="font-size:16px;"><?= h(date('d/m/Y H:i', strtotime($requerimiento['created_at']))) ?></div></div>
++</div>
++
++<div class="panel">
++    <h2 class="mt-0">Descripcion</h2>
++    <p style="white-space: pre-wrap;"><?= h($requerimiento['descripcion']) ?></p>
++    <?php if ($puedeEditar): ?>
++        <a class="btn btn-sm btn-secondary" href="<?= BASE_URL ?>requerimientos/form.php?id=<?= (int)$requerimiento['id'] ?>">Editar</a>
++    <?php endif; ?>
++</div>
++
++<div class="panel">
++    <h2 class="mt-0">Respuesta del desarrollador</h2>
++    <?php if ($requerimiento['respuesta']): ?>
++        <p style="white-space: pre-wrap;"><?= h($requerimiento['respuesta']) ?></p>
++    <?php else: ?>
++        <p class="muted">Sin respuesta todavia.</p>
++    <?php endif; ?>
++</div>
++
++<?php if (is_dev()): ?>
++<div class="panel">
++    <h2 class="mt-0">Actualizar estado y respuesta</h2>
++    <form method="post" action="<?= BASE_URL ?>requerimientos/actualizar.php">
++        <?= csrf_field() ?>
++        <input type="hidden" name="id" value="<?= (int)$requerimiento['id'] ?>">
++        <div class="form-grid">
++            <div class="field">
++                <label>Estado</label>
++                <select name="estado">
++                    <?php foreach ($estadoLabel as $value => $label): ?>
++                        <option value="<?= h($value) ?>" <?= $requerimiento['estado'] === $value ? 'selected' : '' ?>><?= h($label) ?></option>
++                    <?php endforeach; ?>
++                </select>
++            </div>
++            <div class="field full">
++                <label>Respuesta</label>
++                <textarea name="respuesta" rows="4"><?= h($requerimiento['respuesta']) ?></textarea>
++            </div>
++        </div>
++        <div class="actions" style="margin-top:16px;">
++            <button type="submit" class="btn">Guardar</button>
++        </div>
++    </form>
++</div>
++<?php endif; ?>
++
++<?php if ($puedeEditar): ?>
++<div class="panel">
++    <form method="post" action="<?= BASE_URL ?>requerimientos/delete.php" onsubmit="return confirm('Eliminar este requerimiento?');">
++        <?= csrf_field() ?>
++        <input type="hidden" name="id" value="<?= (int)$requerimiento['id'] ?>">
++        <button type="submit" class="btn btn-danger">Eliminar requerimiento</button>
++    </form>
++</div>
++<?php endif; ?>
++
++<?php require __DIR__ . '/../includes/footer.php'; ?>
+diff --git a/servicios/costos.php b/servicios/costos.php
+index f628425..c2da2e3 100644
+--- a/servicios/costos.php
++++ b/servicios/costos.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'servicios/index.php');
+diff --git a/servicios/delete.php b/servicios/delete.php
+index d3ee397..4d3d079 100644
+--- a/servicios/delete.php
++++ b/servicios/delete.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'servicios/index.php');
+diff --git a/servicios/delete_costo.php b/servicios/delete_costo.php
+index b0631c1..83d5323 100644
+--- a/servicios/delete_costo.php
++++ b/servicios/delete_costo.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'servicios/index.php');
+diff --git a/servicios/form.php b/servicios/form.php
+index 36be328..237db3e 100644
+--- a/servicios/form.php
++++ b/servicios/form.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+ $servicio = ['id' => null, 'nombre' => '', 'descripcion' => '', 'precio_venta' => ''];
+diff --git a/usuarios/delete.php b/usuarios/delete.php
+index 4fff685..d9fec31 100644
+--- a/usuarios/delete.php
++++ b/usuarios/delete.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     redirect(BASE_URL . 'usuarios/index.php');
+diff --git a/usuarios/export.php b/usuarios/export.php
+index 240d2a6..a550f4d 100644
+--- a/usuarios/export.php
++++ b/usuarios/export.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $usuarios = $pdo->query('SELECT * FROM usuarios ORDER BY nombre_completo')->fetchAll();
+ 
+diff --git a/usuarios/form.php b/usuarios/form.php
+index 4a0fff8..29bcc9b 100644
+--- a/usuarios/form.php
++++ b/usuarios/form.php
+@@ -1,9 +1,9 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+-$usuario = ['id' => null, 'username' => '', 'nombre_completo' => '', 'rol' => 'cajero', 'activo' => 1];
++$usuario = ['id' => null, 'username' => '', 'nombre_completo' => '', 'rol' => 'admin', 'activo' => 1];
+ $errors = [];
+ 
+ if ($id) {
+@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+     csrf_verify();
+     $usuario['username'] = trim($_POST['username'] ?? '');
+     $usuario['nombre_completo'] = trim($_POST['nombre_completo'] ?? '');
+-    $usuario['rol'] = in_array($_POST['rol'] ?? '', ['admin', 'cajero'], true) ? $_POST['rol'] : 'cajero';
++    $usuario['rol'] = in_array($_POST['rol'] ?? '', ['admin', 'desarrollador'], true) ? $_POST['rol'] : 'admin';
+     $password = $_POST['password'] ?? '';
+ 
+     if ($usuario['username'] === '' || $usuario['nombre_completo'] === '') {
+@@ -74,9 +74,12 @@ require __DIR__ . '/../includes/header.php';
+             <div class="field">
+                 <label>Rol</label>
+                 <select name="rol">
+-                    <option value="cajero" <?= $usuario['rol'] === 'cajero' ? 'selected' : '' ?>>Cajero</option>
+-                    <option value="admin" <?= $usuario['rol'] === 'admin' ? 'selected' : '' ?>>Administrador</option>
++                    <option value="admin" <?= $usuario['rol'] === 'admin' ? 'selected' : '' ?>>Administrador (Contador)</option>
++                    <option value="desarrollador" <?= $usuario['rol'] === 'desarrollador' ? 'selected' : '' ?>>Desarrollador (Soporte)</option>
+                 </select>
++                <?php if ($usuario['rol'] === 'cajero'): ?>
++                    <span class="muted">Este usuario tiene el rol "Cajero", que ya no se usa. Guardelo con un rol nuevo para actualizarlo.</span>
++                <?php endif; ?>
+             </div>
+             <div class="field">
+                 <label>Contrasena <?= $id ? '(dejar en blanco para no cambiar)' : '' ?></label>
+diff --git a/usuarios/index.php b/usuarios/index.php
+index baa0578..fa4171b 100644
+--- a/usuarios/index.php
++++ b/usuarios/index.php
+@@ -1,6 +1,6 @@
+ <?php
+ require_once __DIR__ . '/../includes/bootstrap.php';
+-require_role(['admin']);
++require_admin();
+ 
+ $pageTitle = 'Usuarios';
+ $usuarios = $pdo->query('SELECT * FROM usuarios ORDER BY nombre_completo')->fetchAll();
+@@ -25,7 +25,7 @@ require __DIR__ . '/../includes/header.php';
+         <tr>
+             <td><?= h($u['nombre_completo']) ?></td>
+             <td><?= h($u['username']) ?></td>
+-            <td><?= h($u['rol']) ?></td>
++            <td><?= h(['admin' => 'Administrador (Contador)', 'desarrollador' => 'Desarrollador (Soporte)', 'cajero' => 'Cajero (obsoleto)'][$u['rol']] ?? $u['rol']) ?></td>
+             <td><?= $u['activo'] ? 'Activo' : 'Inactivo' ?></td>
+             <td>
+                 <div class="action-icons">
+-- 
+2.43.0
+
