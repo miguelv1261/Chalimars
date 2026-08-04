@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
-require_role(['admin']);
+require_admin();
 
 $pageTitle = 'Usuarios';
 $usuarios = $pdo->query('SELECT * FROM usuarios ORDER BY nombre_completo')->fetchAll();
@@ -25,7 +25,7 @@ require __DIR__ . '/../includes/header.php';
         <tr>
             <td><?= h($u['nombre_completo']) ?></td>
             <td><?= h($u['username']) ?></td>
-            <td><?= h($u['rol']) ?></td>
+            <td><?= h(['admin' => 'Administrador (Contador)', 'desarrollador' => 'Desarrollador (Soporte)', 'cajero' => 'Cajero (obsoleto)'][$u['rol']] ?? $u['rol']) ?></td>
             <td><?= $u['activo'] ? 'Activo' : 'Inactivo' ?></td>
             <td>
                 <div class="action-icons">

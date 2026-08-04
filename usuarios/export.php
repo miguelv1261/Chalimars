@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
-require_role(['admin']);
+require_admin();
 
 $usuarios = $pdo->query('SELECT * FROM usuarios ORDER BY nombre_completo')->fetchAll();
 

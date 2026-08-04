@@ -5,7 +5,7 @@ require_login();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
 
 if ($id) {
-    require_role(['admin']);
+    require_admin();
 }
 
 $ingreso = ['id' => null, 'fecha' => date('Y-m-d'), 'cliente' => '', 'descripcion' => '', 'monto' => '', 'numero_factura' => ''];

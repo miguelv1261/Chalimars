@@ -1,9 +1,9 @@
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
-require_role(['admin']);
+require_admin();
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
-$usuario = ['id' => null, 'username' => '', 'nombre_completo' => '', 'rol' => 'cajero', 'activo' => 1];
+$usuario = ['id' => null, 'username' => '', 'nombre_completo' => '', 'rol' => 'admin', 'activo' => 1];
 $errors = [];
 
 if ($id) {
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $usuario['username'] = trim($_POST['username'] ?? '');
     $usuario['nombre_completo'] = trim($_POST['nombre_completo'] ?? '');
-    $usuario['rol'] = in_array($_POST['rol'] ?? '', ['admin', 'cajero'], true) ? $_POST['rol'] : 'cajero';
+    $usuario['rol'] = in_array($_POST['rol'] ?? '', ['admin', 'desarrollador'], true) ? $_POST['rol'] : 'admin';
     $password = $_POST['password'] ?? '';
 
     if ($usuario['username'] === '' || $usuario['nombre_completo'] === '') {
@@ -74,9 +74,12 @@ require __DIR__ . '/../includes/header.php';
             <div class="field">
                 <label>Rol</label>
                 <select name="rol">
-                    <option value="cajero" <?= $usuario['rol'] === 'cajero' ? 'selected' : '' ?>>Cajero</option>
-                    <option value="admin" <?= $usuario['rol'] === 'admin' ? 'selected' : '' ?>>Administrador</option>
+                    <option value="admin" <?= $usuario['rol'] === 'admin' ? 'selected' : '' ?>>Administrador (Contador)</option>
+                    <option value="desarrollador" <?= $usuario['rol'] === 'desarrollador' ? 'selected' : '' ?>>Desarrollador (Soporte)</option>
                 </select>
+                <?php if ($usuario['rol'] === 'cajero'): ?>
+                    <span class="muted">Este usuario tiene el rol "Cajero", que ya no se usa. Guardelo con un rol nuevo para actualizarlo.</span>
+                <?php endif; ?>
             </div>
             <div class="field">
                 <label>Contrasena <?= $id ? '(dejar en blanco para no cambiar)' : '' ?></label>
