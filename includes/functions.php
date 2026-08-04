@@ -282,6 +282,36 @@ function aplicar_producto_a_ingreso(PDO $pdo, int $productoId, int $ingresoId, f
 }
 
 /**
+ * Agrega un material del inventario al costeo de un ingreso fuera de la
+ * receta de un servicio (ej. un insumo puntual que no esta en la receta
+ * predefinida): descuenta stock y crea la linea en ingresos_costos con
+ * origen_servicio_id NULL, ya que no proviene de ninguna receta. A
+ * diferencia de aplicar_producto_a_ingreso(), no registra venta ni precio:
+ * solo suma costo, no es un producto para la venta.
+ */
+function agregar_material_a_ingreso(PDO $pdo, int $productoId, int $ingresoId, float $cantidad, int $usuarioId) {
+    $pdo->beginTransaction();
+    try {
+        $producto = descontar_stock_producto(
+            $pdo, $productoId, $cantidad,
+            'Material adicional al costeo - Ingreso #' . $ingresoId,
+            $ingresoId, $usuarioId
+        );
+
+        $costoUnitario = (float)$producto['costo_uso'];
+        $costoTotal = round($cantidad * $costoUnitario, 2);
+
+        $pdo->prepare('INSERT INTO ingresos_costos (ingreso_id, tipo_costo, producto_id, cantidad, costo_unitario, costo_total, creado_por) VALUES (?,?,?,?,?,?,?)')
+            ->execute([$ingresoId, 'material', $productoId, $cantidad, $costoUnitario, $costoTotal, $usuarioId]);
+
+        $pdo->commit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+}
+
+/**
  * Sube un archivo verificando extension y tamano permitidos.
  * Retorna el nombre de archivo generado (sin ruta) o null si no se envio archivo.
  * Lanza RuntimeException si el archivo es invalido.

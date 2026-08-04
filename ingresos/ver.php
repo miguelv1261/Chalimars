@@ -179,9 +179,39 @@ require __DIR__ . '/../includes/header.php';
     </form>
 </div>
 
+<div class="panel">
+    <h2 class="mt-0">Agregar material extra al costeo</h2>
+    <p class="muted">Suma un material del inventario que se uso aparte de la receta del servicio (no es un producto para la venta): solo se descuenta stock y se suma su costo a este ingreso.</p>
+    <form method="post" action="<?= BASE_URL ?>ingresos/agregar_material.php">
+        <?= csrf_field() ?>
+        <input type="hidden" name="ingreso_id" value="<?= (int)$ingreso['id'] ?>">
+        <div class="form-grid">
+            <div class="field full">
+                <label>Material</label>
+                <div class="searchable-select" id="ss-material-costo">
+                    <input type="text" class="ss-input" placeholder="Buscar material por nombre..." autocomplete="off">
+                    <input type="hidden" name="producto_id">
+                    <div class="ss-panel"></div>
+                </div>
+            </div>
+            <div class="field">
+                <label>Cantidad (unidades de uso)</label>
+                <input type="number" step="0.01" min="0.01" name="cantidad" value="1" required>
+            </div>
+        </div>
+        <div class="actions" style="margin-top:16px;">
+            <button type="submit" class="btn">Agregar material</button>
+            <?php if (!$productosActivos): ?><span class="muted">No hay productos activos. <a href="<?= BASE_URL ?>productos/form.php">Crear uno</a>.</span><?php endif; ?>
+        </div>
+    </form>
+</div>
+
 <script>
 new SearchableSelect(document.getElementById('ss-producto-venta'), <?= json_encode(array_map(function ($p) {
     return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'precio ' . money($p['precio_venta_uso']) . ' - stock uso: ' . $p['stock_uso']];
+}, $productosActivos)) ?>);
+new SearchableSelect(document.getElementById('ss-material-costo'), <?= json_encode(array_map(function ($p) {
+    return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'costo uso ' . money($p['costo_uso']) . ' - stock uso: ' . $p['stock_uso']];
 }, $productosActivos)) ?>);
 </script>
 
