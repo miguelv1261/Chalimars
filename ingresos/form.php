@@ -65,6 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cantidadServicio = (float)($_POST['cantidad_servicio'] ?? 1) ?: 1;
             $productoId = (int)($_POST['producto_id'] ?? 0) ?: null;
             $cantidadProducto = (float)($_POST['cantidad_producto'] ?? 1) ?: 1;
+            $materialId = (int)($_POST['material_id'] ?? 0) ?: null;
+            $cantidadMaterial = (float)($_POST['cantidad_material'] ?? 1) ?: 1;
 
             $stmt = $pdo->prepare('INSERT INTO ingresos (fecha, cliente, descripcion, monto, numero_factura, factura_pdf, creado_por) VALUES (?,?,?,?,?,?,?)');
             $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, current_user()['id']]);
@@ -87,9 +89,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     flash_set('Ingreso registrado, pero no se pudo vender el producto: ' . $e->getMessage(), 'error');
                 }
             }
+            if ($materialId) {
+                try {
+                    agregar_material_a_ingreso($pdo, $materialId, $newId, $cantidadMaterial, current_user()['id']);
+                    $mensajes[] = 'el material adicional';
+                } catch (RuntimeException $e) {
+                    flash_set('Ingreso registrado, pero no se pudo agregar el material: ' . $e->getMessage(), 'error');
+                }
+            }
             if ($mensajes) {
                 flash_set('Ingreso registrado y costeado automaticamente con ' . implode(' y ', $mensajes) . '.');
-            } elseif (!$servicioId && !$productoId) {
+            } elseif (!$servicioId && !$productoId && !$materialId) {
                 flash_set('Ingreso registrado. Ahora puede aplicar un servicio o vender un producto para costearlo.');
             }
             redirect(BASE_URL . 'ingresos/ver.php?id=' . $newId);
@@ -134,6 +144,18 @@ require __DIR__ . '/../includes/header.php';
             <div class="field">
                 <label>Cantidad del producto (unidades de uso)</label>
                 <input type="number" step="0.01" min="0.01" name="cantidad_producto" id="cantidad_producto" value="1">
+            </div>
+            <div class="field full">
+                <label>Material adicional (opcional, aparte de la receta - no es venta, solo suma costo y descuenta stock)</label>
+                <div class="searchable-select" id="ss-material">
+                    <input type="text" class="ss-input" placeholder="Buscar material por nombre..." autocomplete="off">
+                    <input type="hidden" name="material_id" id="material_id">
+                    <div class="ss-panel"></div>
+                </div>
+            </div>
+            <div class="field">
+                <label>Cantidad del material (unidades de uso)</label>
+                <input type="number" step="0.01" min="0.01" name="cantidad_material" id="cantidad_material" value="1">
             </div>
             <?php endif; ?>
             <div class="field">
@@ -183,6 +205,11 @@ require __DIR__ . '/../includes/header.php';
         return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'precio ' . money($p['precio_venta_uso']) . ' - stock uso: ' . $p['stock_uso']];
     }, $productosActivos)) ?>;
     new SearchableSelect(document.getElementById('ss-producto'), productosParaVenta);
+
+    var materialesParaCosto = <?= json_encode(array_map(function ($p) {
+        return ['value' => (string)$p['id'], 'label' => $p['nombre'], 'meta' => 'costo uso ' . money($p['costo_uso']) . ' - stock uso: ' . $p['stock_uso']];
+    }, $productosActivos)) ?>;
+    new SearchableSelect(document.getElementById('ss-material'), materialesParaCosto);
 
     function sugerirMontoProducto() {
         var productoId = document.getElementById('producto_id').value;
