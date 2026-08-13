@@ -8,7 +8,7 @@ if ($id) {
     require_admin();
 }
 
-$ingreso = ['id' => null, 'fecha' => date('Y-m-d'), 'cliente' => '', 'descripcion' => '', 'monto' => '', 'numero_factura' => ''];
+$ingreso = ['id' => null, 'fecha' => date('Y-m-d'), 'cliente' => '', 'descripcion' => '', 'monto' => '', 'asiento' => ''];
 $errors = [];
 
 if ($id) {
@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ingreso['descripcion'] = trim($_POST['descripcion'] ?? '');
     $ingreso['monto'] = (float)($_POST['monto'] ?? 0);
     $ingreso['numero_factura'] = trim($_POST['numero_factura'] ?? '');
-
+    $ingreso['asiento'] = trim($_POST['asiento'] ?? '');
     if ($ingreso['monto'] <= 0) {
         $errors[] = 'El monto debe ser mayor a cero.';
     }
@@ -52,11 +52,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$errors) {
         if ($id) {
             if ($pdfName) {
-                $stmt = $pdo->prepare('UPDATE ingresos SET fecha=?, cliente=?, descripcion=?, monto=?, numero_factura=?, factura_pdf=? WHERE id=?');
-                $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, $id]);
+                $stmt = $pdo->prepare('UPDATE ingresos SET fecha=?, cliente=?, descripcion=?, monto=?, numero_factura=?, factura_pdf=?, asiento=? WHERE id=?');
+                $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, $ingreso['asiento'], $id]);
             } else {
-                $stmt = $pdo->prepare('UPDATE ingresos SET fecha=?, cliente=?, descripcion=?, monto=?, numero_factura=? WHERE id=?');
-                $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $id]);
+                $stmt = $pdo->prepare('UPDATE ingresos SET fecha=?, cliente=?, descripcion=?, monto=?, numero_factura=? asiento = ? WHERE id=?');
+                $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $ingreso['asiento'], $id]);
             }
             flash_set('Ingreso actualizado correctamente.');
             redirect(BASE_URL . 'ingresos/ver.php?id=' . $id);
@@ -68,8 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $materialId = (int)($_POST['material_id'] ?? 0) ?: null;
             $cantidadMaterial = (float)($_POST['cantidad_material'] ?? 1) ?: 1;
 
-            $stmt = $pdo->prepare('INSERT INTO ingresos (fecha, cliente, descripcion, monto, numero_factura, factura_pdf, creado_por) VALUES (?,?,?,?,?,?,?)');
-            $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, current_user()['id']]);
+            $stmt = $pdo->prepare('INSERT INTO ingresos (fecha, cliente, descripcion, monto, numero_factura, factura_pdf, creado_por, asiento) VALUES (?,?,?,?,?,?,?,?)');
+            $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, current_user()['id'], $ingreso['asiento']]);
             $newId = (int)$pdo->lastInsertId();
 
             $mensajes = [];
@@ -165,6 +165,10 @@ require __DIR__ . '/../includes/header.php';
             <div class="field">
                 <label>Cliente</label>
                 <input type="text" name="cliente" value="<?= h($ingreso['cliente']) ?>">
+            </div>
+            <div class="field">
+                <label>N° Asiento</label>
+                <input type="text" name="asiento" value="<?= h($ingreso['asiento']) ?>">
             </div>
             <div class="field full">
                 <label>Descripcion del servicio / venta</label>
