@@ -512,6 +512,46 @@ input[type="checkbox"] { width: auto; }
 .card .label { font-size: 11.5px; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em; }
 .card .value { font-size: 25px; font-weight: 800; margin-top: 6px; letter-spacing: -0.01em; }
 
+.card-alert { border-color: var(--error); }
+.card-alert .value { color: var(--error); }
+
+/* ---------- Chips (filtros rapidos sobre una tabla) ---------- */
+
+.chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.chip:hover { border-color: var(--primary); color: var(--text); }
+
+.chip.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+/* Columna presente en el DOM solo para alimentar el filtro de la barra de
+   herramientas (datatable.js), sin ocupar espacio visual en la tabla. */
+.col-hidden-filter { display: none; }
+
 /* ---------- Tags ---------- */
 
 .tag {

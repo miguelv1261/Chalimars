@@ -22,7 +22,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="table-wrap" data-table>
 <table>
     <thead>
-    <tr><th>Fecha</th><th>Cliente</th><th>Descripcion</th><th>Monto</th><th>Costo total</th><th>Utilidad</th><th>Factura</th><th># Asiento</th><th>Acciones</th></tr>
+    <tr><th>Fecha</th><th>Cliente</th><th>Descripcion</th><th>Monto</th><th>Costo total</th><th>Utilidad</th><th>Nº Factura</th><th># Asiento</th><th>Acciones</th></tr>
     </thead>
     <tbody>
     <?php foreach ($ingresos as $i): $utilidad = $i['monto'] - $i['total_costo']; ?>
