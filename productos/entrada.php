@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
         $costoUso = round($precioCompraUnitario / $producto['rendimiento'], 4);
-        $nuevoStockTangible = round((float)$producto['stock_tangible'] + $cantidadCompra, 2);
+        $nuevoStockTangible = round((float)$producto['stock_tangible'] + $cantidadCompra, 4);
         $nuevoStockUso = round($nuevoStockTangible * $producto['rendimiento'], 2);
         $cantidadUso = round($nuevoStockUso - (float)$producto['stock_uso'], 2);
         $costoTotal = round($cantidadUso * $costoUso, 2);

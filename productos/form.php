@@ -23,6 +23,7 @@ if ($id) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
+    $rendimientoAnterior = (float)$producto['rendimiento'];
     $producto['nombre'] = trim($_POST['nombre'] ?? '');
     $producto['rendimiento'] = (float)($_POST['rendimiento'] ?? 1);
     $producto['precio_compra'] = (float)($_POST['precio_compra'] ?? 0);
@@ -45,9 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
             if ($id) {
-                // stock_tangible nunca se toca aqui; stock_uso se recalcula
-                // para mantenerse consistente si cambio el rendimiento.
-                $stockUso = round((float)$producto['stock_tangible'] * $producto['rendimiento'], 2);
+                // stock_tangible nunca se toca aqui. stock_uso solo se
+                // reescala si el rendimiento realmente cambio, y se hace en
+                // proporcion al stock_uso actual (no recalculando desde
+                // stock_tangible, que puede tener arrastre de redondeo por
+                // ventas previas) para no perder ventas ya descontadas.
+                if ($rendimientoAnterior > 0 && $rendimientoAnterior != $producto['rendimiento']) {
+                    $stockUso = round((float)$producto['stock_uso'] / $rendimientoAnterior * $producto['rendimiento'], 2);
+                } else {
+                    $stockUso = (float)$producto['stock_uso'];
+                }
                 $stmt = $pdo->prepare('UPDATE productos SET nombre=?, rendimiento=?, precio_compra=?, costo_uso=?, precio_venta_uso=?, stock_minimo=?, stock_uso=? WHERE id=?');
                 $stmt->execute([$producto['nombre'], $producto['rendimiento'], $producto['precio_compra'], $costoUso, $producto['precio_venta_uso'], $producto['stock_minimo'], $stockUso, $id]);
             } else {

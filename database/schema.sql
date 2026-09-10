@@ -61,12 +61,15 @@ CREATE TABLE proveedores (
 --
 -- Un producto se COMPRA en una unidad tangible (ej. una botella) a un
 -- precio_compra (ej. $15) pero RINDE varias unidades de uso segun
--- "rendimiento" (ej. 20). stock_tangible es la fuente de verdad (lo
--- comprado); stock_uso siempre se recalcula como stock_tangible *
--- rendimiento. costo_uso = precio_compra / rendimiento es lo que se usa
--- para costear (ej. $15 / 20 = $0.75 por uso). precio_venta_uso es el
--- precio al que se vende cada unidad de uso cuando el producto se vende
--- directamente en un ingreso (no como parte de la receta de un servicio).
+-- "rendimiento" (ej. 20). stock_uso es la fuente de verdad operativa: cada
+-- venta/entrada la ajusta de forma exacta en unidades de uso. stock_tangible
+-- se guarda solo como referencia informativa (= stock_uso / rendimiento,
+-- con 4 decimales para que rendimientos altos no pierdan precision) y no
+-- debe usarse para recalcular stock_uso salvo cuando cambia el rendimiento.
+-- costo_uso = precio_compra / rendimiento es lo que se usa para costear
+-- (ej. $15 / 20 = $0.75 por uso). precio_venta_uso es el precio al que se
+-- vende cada unidad de uso cuando el producto se vende directamente en un
+-- ingreso (no como parte de la receta de un servicio).
 -- ============================================================
 CREATE TABLE productos (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -75,7 +78,7 @@ CREATE TABLE productos (
     rendimiento DECIMAL(10,2) NOT NULL DEFAULT 1,
     precio_compra DECIMAL(10,2) NOT NULL DEFAULT 0,
     costo_uso DECIMAL(10,2) NOT NULL DEFAULT 0,
-    stock_tangible DECIMAL(10,2) NOT NULL DEFAULT 0,
+    stock_tangible DECIMAL(14,4) NOT NULL DEFAULT 0,
     precio_venta_uso DECIMAL(10,2) NOT NULL DEFAULT 0,
     stock_uso DECIMAL(10,2) NOT NULL DEFAULT 0,
     stock_minimo DECIMAL(10,2) NOT NULL DEFAULT 0,

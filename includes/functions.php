@@ -115,12 +115,12 @@ function costo_mano_obra_servicio($precioVenta) {
 
 /**
  * Descuenta stock de un producto en unidades de uso, de forma atomica
- * (FOR UPDATE) y manteniendo el invariante stock_uso = stock_tangible *
- * rendimiento (stock_tangible es la fuente de verdad). Registra el
- * movimiento de salida en productos_movimientos. Debe llamarse dentro de
- * una transaccion ya abierta por el caller. Lanza RuntimeException si el
- * producto no existe o no hay stock suficiente. Retorna la fila del
- * producto (previa al descuento).
+ * (FOR UPDATE). stock_uso se descuenta de forma exacta (es la fuente de
+ * verdad operativa); stock_tangible se ajusta en la misma proporcion solo
+ * como referencia informativa. Registra el movimiento de salida en
+ * productos_movimientos. Debe llamarse dentro de una transaccion ya abierta
+ * por el caller. Lanza RuntimeException si el producto no existe o no hay
+ * stock suficiente. Retorna la fila del producto (previa al descuento).
  */
 function descontar_stock_producto(PDO $pdo, int $productoId, float $cantidadUso, string $motivo, ?int $ingresoId, int $usuarioId): array {
     $stmt = $pdo->prepare('SELECT * FROM productos WHERE id = ? FOR UPDATE');
@@ -135,7 +135,7 @@ function descontar_stock_producto(PDO $pdo, int $productoId, float $cantidadUso,
 
     $nuevoStockUso = round($producto['stock_uso'] - $cantidadUso, 2);
     $nuevoStockTangible = $producto['rendimiento'] > 0
-        ? round($producto['stock_tangible'] - ($cantidadUso / $producto['rendimiento']), 2)
+        ? round($producto['stock_tangible'] - ($cantidadUso / $producto['rendimiento']), 4)
         : $producto['stock_tangible'];
     $pdo->prepare('UPDATE productos SET stock_uso = ?, stock_tangible = ? WHERE id = ?')
         ->execute([$nuevoStockUso, $nuevoStockTangible, $productoId]);
@@ -149,9 +149,9 @@ function descontar_stock_producto(PDO $pdo, int $productoId, float $cantidadUso,
 }
 
 /**
- * Inverso de descontar_stock_producto(): repone stock (entrada) manteniendo
- * el mismo invariante stock_uso/stock_tangible. Se usa al eliminar una
- * linea de costo o de venta de producto ya aplicada a un ingreso.
+ * Inverso de descontar_stock_producto(): repone stock (entrada) con el
+ * mismo criterio stock_uso/stock_tangible. Se usa al eliminar una linea de
+ * costo o de venta de producto ya aplicada a un ingreso.
  */
 function reponer_stock_producto(PDO $pdo, int $productoId, float $cantidadUso, string $motivo, ?int $ingresoId, int $usuarioId): void {
     $stmt = $pdo->prepare('SELECT * FROM productos WHERE id = ? FOR UPDATE');
@@ -163,7 +163,7 @@ function reponer_stock_producto(PDO $pdo, int $productoId, float $cantidadUso, s
 
     $nuevoStockUso = round($producto['stock_uso'] + $cantidadUso, 2);
     $nuevoStockTangible = $producto['rendimiento'] > 0
-        ? round($producto['stock_tangible'] + ($cantidadUso / $producto['rendimiento']), 2)
+        ? round($producto['stock_tangible'] + ($cantidadUso / $producto['rendimiento']), 4)
         : $producto['stock_tangible'];
     $pdo->prepare('UPDATE productos SET stock_uso = ?, stock_tangible = ? WHERE id = ?')
         ->execute([$nuevoStockUso, $nuevoStockTangible, $productoId]);
