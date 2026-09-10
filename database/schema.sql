@@ -181,6 +181,7 @@ CREATE TABLE ingresos (
     caja_sesion_id INT NULL,
     creado_por INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    asiento VARCHAR(50) DEFAULT NULL,
     FOREIGN KEY (caja_sesion_id) REFERENCES cajas_sesiones(id),
     FOREIGN KEY (creado_por) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;

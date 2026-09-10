@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare('UPDATE ingresos SET fecha=?, cliente=?, descripcion=?, monto=?, numero_factura=?, factura_pdf=?, asiento=? WHERE id=?');
                 $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $pdfName, $ingreso['asiento'], $id]);
             } else {
-                $stmt = $pdo->prepare('UPDATE ingresos SET fecha=?, cliente=?, descripcion=?, monto=?, numero_factura=? asiento = ? WHERE id=?');
+                $stmt = $pdo->prepare('UPDATE ingresos SET fecha=?, cliente=?, descripcion=?, monto=?, numero_factura=?, asiento=? WHERE id=?');
                 $stmt->execute([$ingreso['fecha'], $ingreso['cliente'], $ingreso['descripcion'], $ingreso['monto'], $ingreso['numero_factura'], $ingreso['asiento'], $id]);
             }
             flash_set('Ingreso actualizado correctamente.');
