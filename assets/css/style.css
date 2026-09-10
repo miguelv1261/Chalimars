@@ -287,7 +287,10 @@ tbody tr:last-child td { border-bottom: none; }
     box-shadow: var(--shadow-sm);
 }
 
-.table-wrap table { border-radius: var(--radius-lg); overflow: hidden; }
+/* Sin overflow:hidden aqui: convertiria a <table> en el contenedor de
+   scroll mas cercano para position:sticky y romperia la columna de
+   acciones fija (.table-wrap ya recorta las esquinas redondeadas). */
+.table-wrap table { border-radius: var(--radius-lg); }
 
 /* La ultima columna (botonera de acciones) queda fija a la derecha al
    desplazar la tabla horizontalmente, para no tener que arrastrar hasta
