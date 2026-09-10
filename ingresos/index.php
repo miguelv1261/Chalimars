@@ -33,7 +33,7 @@ require __DIR__ . '/../includes/header.php';
             <td><?= money($i['monto']) ?></td>
             <td><?= money($i['total_costo']) ?></td>
             <td style="color: <?= $utilidad >= 0 ? '#1e7d3c' : '#c4293a' ?>;"><?= money($utilidad) ?></td>
-            <td><?= $i['factura_pdf'] ? '<a href="' . BASE_URL . 'uploads/facturas/' . h($i['factura_pdf']) . '" target="_blank">PDF</a>' : '-' ?></td>
+            <td><?= h($i['numero_factura']) ?></td>
             <td><?= h($i['asiento']) ?></td>
             <td>
                 <div class="action-icons">

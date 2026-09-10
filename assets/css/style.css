@@ -289,6 +289,22 @@ tbody tr:last-child td { border-bottom: none; }
 
 .table-wrap table { border-radius: var(--radius-lg); overflow: hidden; }
 
+/* La ultima columna (botonera de acciones) queda fija a la derecha al
+   desplazar la tabla horizontalmente, para no tener que arrastrar hasta
+   el final para llegar a los botones. Aplica a todas las tablas del
+   sistema envueltas en .table-wrap. */
+.table-wrap th:last-child,
+.table-wrap td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    box-shadow: -6px 0 6px -6px rgba(20, 15, 10, 0.18);
+}
+
+.table-wrap th:last-child { background: #fbf9f6; }
+.table-wrap td:last-child { background: var(--panel); }
+.table-wrap tbody tr:hover td:last-child { background: #fbf8f5; }
+
 /* ---------- Barra de herramientas de tabla (buscar / filtrar / ordenar) ---------- */
 
 .table-toolbar {
